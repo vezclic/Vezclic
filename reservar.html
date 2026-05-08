@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agendamento - Vezclic!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --deep-blue: #0f172a;
+            --card-bg: #1e293b;
+            --accent-blue: #3b82f6;
+            --accent-orange: #f97316;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--deep-blue);
+            color: white;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .step-content { display: none; }
+        .step-content.active { display: block; animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .date-card.selected {
+            background-color: white;
+            color: var(--deep-blue);
+            transform: scale(1.05);
+        }
+        .time-card.selected {
+            background-color: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+        .time-card.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+            text-decoration: line-through;
+        }
+        .input-mask {
+            background: #1e293b;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { height: 4px; width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        .shimmer {
+            background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer { to { background-position: -200% 0; } }
+    </style>
+</head>
+<body class="pb-24">
+
+    <!-- Header / Cover -->
+    <div class="relative w-full h-48 md:h-64 bg-slate-800">
+        <img id="coverImg" src="https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?auto=format&fit=crop&q=80&w=1000" class="w-full h-full object-cover opacity-60">
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent"></div>
+        <button id="whatsappBtn" class="absolute top-4 right-4 bg-green-500 p-3 rounded-full shadow-lg hover:scale-110 transition-transform">
+            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        </button>
+    </div>
+
+    <!-- Profile Info -->
+    <div class="px-6 -mt-12 relative z-10">
+        <div class="flex items-end gap-4 mb-6">
+            <div class="w-24 h-24 rounded-3xl border-4 border-[--deep-blue] overflow-hidden bg-slate-700 shadow-xl">
+                <img id="profileImg" src="https://ui-avatars.com/api/?name=V&background=3b82f6&color=fff" class="w-full h-full object-cover">
+            </div>
+            <div class="flex-1 mb-2">
+                <h2 id="empresaNome" class="text-2xl font-black tracking-tight leading-none mb-1">Carregando...</h2>
+                <div class="flex items-center gap-2 text-slate-400 text-sm">
+                    <span id="servicoNome">...</span> • <span id="servicoPreco">R$ 0,00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="flex gap-1 mb-8">
+            <div id="pb1" class="h-1 flex-1 bg-blue-500 rounded-full transition-all duration-300"></div>
+            <div id="pb2" class="h-1 flex-1 bg-slate-700 rounded-full transition-all duration-300"></div>
+            <div id="pb3" class="h-1 flex-1 bg-slate-700 rounded-full transition-all duration-300"></div>
+        </div>
+
+        <!-- STEP 1: Escolha o Dia -->
+        <section id="step1" class="step-content active">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">1. Escolha o dia</h3>
+                <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">Passo 1 de 3</span>
+            </div>
+            
+            <div id="daysGrid" class="grid grid-cols-2 gap-3">
+                <!-- Rendered JS -->
+            </div>
+
+            <div class="mt-8">
+                <button onclick="goToStep(2)" id="btnNext1" disabled class="w-full bg-slate-800 text-slate-500 font-bold py-5 rounded-2xl text-lg transition-all disabled:opacity-50">
+                    CONTINUAR
+                </button>
+            </div>
+        </section>
+
+        <!-- STEP 2: Escolha o Horário -->
+        <section id="step2" class="step-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">2. Escolha o horário</h3>
+                <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">Passo 2 de 3</span>
+            </div>
+
+            <div id="timesGrid" class="grid grid-cols-3 gap-3">
+                <!-- Rendered JS -->
+            </div>
+
+            <div class="mt-8 flex gap-3">
+                <button onclick="goToStep(1)" class="p-5 bg-slate-800 rounded-2xl">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <button onclick="goToStep(3)" id="btnNext2" disabled class="flex-1 bg-blue-600 text-white font-bold py-5 rounded-2xl text-lg shadow-lg shadow-blue-900/30">
+                    CONTINUAR
+                </button>
+            </div>
+        </section>
+
+        <!-- STEP 3: Seus Dados -->
+        <section id="step3" class="step-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">3. Seus Dados</h3>
+                <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">Passo 3 de 3</span>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 ml-1">Seu Nome</label>
+                    <input type="text" id="clienteNome" placeholder="Como quer ser chamado?" class="input-mask w-full p-4 rounded-xl text-white outline-none focus:border-blue-500 transition-colors">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 ml-1">Seu WhatsApp</label>
+                    <input type="text" id="clienteWhats" placeholder="(00) 00000-0000" class="input-mask w-full p-4 rounded-xl text-white outline-none focus:border-blue-500 transition-colors">
+                </div>
+            </div>
+
+            <div class="mt-8 bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl mb-6">
+                <p class="text-xs text-blue-400 font-medium">Resumo da reserva:</p>
+                <p id="resumoFinal" class="text-sm font-bold mt-1">Carregando resumo...</p>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="goToStep(2)" class="p-5 bg-slate-800 rounded-2xl">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <button id="finishBtn" class="flex-1 bg-green-600 hover:bg-green-500 text-white font-black py-5 rounded-2xl text-lg shadow-xl transition-all active:scale-95">
+                    FINALIZAR RESERVA
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorModal" class="fixed inset-0 bg-slate-900 z-[100] hidden items-center justify-center p-8 text-center">
+        <div>
+            <div class="text-6xl mb-4">😅</div>
+            <h2 class="text-2xl font-bold mb-2">Empresa não encontrada</h2>
+            <p class="text-slate-400 mb-6">Verifique o link ou tente novamente.</p>
+            <a href="registro.html" class="inline-block bg-blue-600 px-6 py-3 rounded-xl font-bold">Criar minha conta</a>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIG ---
+        const SUPABASE_URL = 'https://nojkeyqycpvnolnuzwnj.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_v16thezDVJS97xDtzo8SmA_X9tz3G4M';
+        const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // --- STATE ---
+        let enterprise = null;
+        let service = null;
+        let workingHours = [];
+        let bookedSlots = [];
+        let selection = { date: null, time: null };
+
+        // --- UTILS ---
+        const getSlug = () => new URLSearchParams(window.location.search).get('u');
+        const normalizeSlug = (str) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+        
+        const daysShort = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
+        const monthsShort = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+
+        // --- INITIALIZATION ---
+        async function init() {
+            const slug = getSlug();
+            if (!slug) {
+                showError();
+                return;
+            }
+
+            // 1. Fetch Company
+            const { data: companies, error } = await db.from('empresas').select('*');
+            enterprise = companies?.find(c => normalizeSlug(c.empresa) === slug);
+
+            if (!enterprise) {
+                showError();
+                return;
+            }
+
+            // 2. Fetch Services & Working Hours
+            const [srvRes, hrsRes] = await Promise.all([
+                db.from('servicos').select('*').eq('eid', enterprise.id).limit(1),
+                db.from('horarios').select('*').eq('eid', enterprise.id)
+            ]);
+
+            service = srvRes.data?.[0];
+            workingHours = hrsRes.data || [];
+
+            updateUIHeader();
+            renderDays();
+        }
+
+        function updateUIHeader() {
+            document.getElementById('empresaNome').innerText = enterprise.empresa;
+            document.getElementById('servicoNome').innerText = service ? service.servico : 'Serviço';
+            document.getElementById('servicoPreco').innerText = service ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(service.valor) : 'R$ 0,00';
+            document.getElementById('profileImg').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(enterprise.empresa)}&background=3b82f6&color=fff&size=256&bold=true`;
+            
+            // Random cover based on business name
+            const seeds = ['barber', 'salon', 'office', 'spa', 'clinic'];
+            const seed = seeds[enterprise.id % seeds.length];
+            document.getElementById('coverImg').src = `https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?auto=format&fit=crop&q=60&w=1000`;
+
+            document.getElementById('whatsappBtn').onclick = () => {
+                window.open(`https://wa.me/55${enterprise.whatsapp}`, '_blank');
+            };
+        }
+
+        // --- STEP 1: DAYS ---
+        function renderDays() {
+            const container = document.getElementById('daysGrid');
+            container.innerHTML = '';
+            
+            // Generate next 14 days
+            for (let i = 0; i < 14; i++) {
+                const date = new Date();
+                date.setDate(date.getDate() + i);
+                const dayOfWeek = date.getDay(); // 0-6
+
+                // Check if company works this day
+                const works = workingHours.some(h => h.dia === (dayOfWeek === 0 ? 6 : dayOfWeek - 1)); // Adjust index if needed
+                
+                const card = document.createElement('div');
+                card.className = `date-card p-4 rounded-3xl bg-slate-800/50 border border-white/5 text-center cursor-pointer transition-all ${!works ? 'opacity-20 pointer-events-none' : ''}`;
+                card.innerHTML = `
+                    <div class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1">${daysShort[dayOfWeek]}</div>
+                    <div class="text-2xl font-black">${date.getDate()}</div>
+                    <div class="text-[10px] font-bold uppercase tracking-widest opacity-60 mt-1">${monthsShort[date.getMonth()]}</div>
+                `;
+
+                card.onclick = () => {
+                    document.querySelectorAll('.date-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    selection.date = date.toISOString().split('T')[0];
+                    selection.time = null;
+                    document.getElementById('btnNext1').disabled = false;
+                    document.getElementById('btnNext1').classList.replace('bg-slate-800', 'bg-blue-600');
+                    document.getElementById('btnNext1').classList.replace('text-slate-500', 'text-white');
+                };
+
+                container.appendChild(card);
+            }
+        }
+
+        // --- STEP 2: TIMES ---
+        async function renderTimes() {
+            const container = document.getElementById('timesGrid');
+            container.innerHTML = '<div class="col-span-3 py-10 text-center shimmer rounded-2xl"></div>';
+            
+            const selectedDate = new Date(selection.date + 'T12:00:00');
+            const dayOfWeek = selectedDate.getDay();
+            const dbDayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Ajuste para 0=Seg, 6=Dom
+            
+            const hours = workingHours.find(h => h.dia === dbDayIndex);
+            
+            // Fetch existing bookings
+            const { data: bookings } = await db.from('agendamentos')
+                .select('hora')
+                .eq('eid', enterprise.id)
+                .eq('data', selection.date);
+
+            container.innerHTML = '';
+            
+            if (!hours) {
+                container.innerHTML = '<p class="col-span-3 text-center text-slate-500 py-10">Fechado neste dia.</p>';
+                return;
+            }
+
+            // Generate slots
+            const start = parseInt(hours.inicio.split(':')[0]);
+            const end = parseInt(hours.fim.split(':')[0]);
+            const duration = service?.tempo || 30;
+
+            let current = new Date();
+            current.setHours(start, 0, 0, 0);
+            const stop = new Date();
+            stop.setHours(end, 0, 0, 0);
+
+            while (current < stop) {
+                const timeStr = current.toTimeString().substring(0, 5);
+                const isBooked = bookings?.some(b => b.hora.substring(0, 5) === timeStr);
+                
+                const card = document.createElement('div');
+                card.className = `time-card p-4 rounded-2xl bg-slate-800/50 border border-white/5 text-center font-bold cursor-pointer transition-all ${isBooked ? 'disabled' : ''}`;
+                card.innerText = timeStr;
+                
+                card.onclick = () => {
+                    document.querySelectorAll('.time-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    selection.time = timeStr;
+                    document.getElementById('btnNext2').disabled = false;
+                };
+
+                container.appendChild(card);
+                current.setMinutes(current.getMinutes() + duration);
+            }
+        }
+
+        // --- NAVIGATION ---
+        function goToStep(s) {
+            document.querySelectorAll('.step-content').forEach(c => c.classList.remove('active'));
+            document.getElementById('step' + s).classList.add('active');
+            
+            // Progress bar
+            for(let i=1; i<=3; i++) {
+                const bar = document.getElementById('pb'+i);
+                bar.classList.toggle('bg-blue-500', i <= s);
+                bar.classList.toggle('bg-slate-700', i > s);
+            }
+
+            if (s === 2) renderTimes();
+            if (s === 3) {
+                const d = selection.date.split('-');
+                document.getElementById('resumoFinal').innerText = `${service.servico} dia ${d[2]}/${d[1]} às ${selection.time}`;
+            }
+            window.scrollTo(0, 0);
+        }
+
+        // --- MASK ---
+        document.getElementById('clienteWhats').oninput = (e) => {
+            let x = e.target.value.replace(/\D/g, '').match(/(\d{0,2})(\d{0,5})(\d{0,4})/);
+            e.target.value = !x[2] ? x[1] : '(' + x[1] + ') ' + x[2] + (x[3] ? '-' + x[3] : '');
+        };
+
+        // --- FINISH ---
+        document.getElementById('finishBtn').onclick = async () => {
+            const nome = document.getElementById('clienteNome').value.trim();
+            const whats = document.getElementById('clienteWhats').value.replace(/\D/g, '');
+
+            if (nome.length < 3 || whats.length < 10) {
+                alert("Preencha seu nome e WhatsApp corretamente.");
+                return;
+            }
+
+            const btn = document.getElementById('finishBtn');
+            btn.disabled = true;
+            btn.innerText = "RESERVANDO...";
+
+            const { data, error } = await db.from('agendamentos').insert([{
+                eid: enterprise.id,
+                sid: service.id,
+                cliente: nome,
+                whatsapp: whats,
+                data: selection.date,
+                hora: selection.time + ':00'
+            }]);
+
+            if (error) {
+                alert("Erro ao agendar: " + error.message);
+                btn.disabled = false;
+                btn.innerText = "FINALIZAR RESERVA";
+                return;
+            }
+
+            // WhatsApp Notification
+            const msg = `Olá! Acabei de fazer um agendamento pelo Vezclic!\n\n📌 *Detalhes:*\nEmpresa: ${enterprise.empresa}\nServiço: ${service.servico}\nData: ${selection.date}\nHorário: ${selection.time}\nCliente: ${nome}`;
+            const link = `https://wa.me/55${enterprise.whatsapp}?text=${encodeURIComponent(msg)}`;
+            
+            alert("Agendamento realizado com sucesso!");
+            window.location.href = link;
+        };
+
+        function showError() {
+            document.getElementById('errorModal').classList.remove('hidden');
+            document.getElementById('errorModal').classList.add('flex');
+        }
+
+        init();
+    </script>
+</body>
+</html>
