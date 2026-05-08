@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vezclic! — Registrando...</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --deep-blue:   #0f172a;
+            --accent-blue: #3b82f6;
+            --accent-orange: #f97316;
+            --accent-green:  #22c55e;
+        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--deep-blue);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* subtle radial glow behind content */
+        .glow-bg {
+            position: fixed;
+            width: 600px; height: 600px;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1.2s ease;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .glow-bg.green  { background: radial-gradient(circle, rgba(34,197,94,.35), transparent 70%); }
+        .glow-bg.orange { background: radial-gradient(circle, rgba(249,115,22,.35), transparent 70%); }
+        .glow-bg.visible { opacity: 1; }
+
+        #particles { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+
+        /* ─── CONTENT ─────────────────────────────── */
+        .content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 2rem;
+            max-width: 480px;
+            width: 100%;
+        }
+
+        /* LOGO */
+        .logo {
+            font-size: 2rem;
+            font-weight: 900;
+            letter-spacing: -0.05em;
+            margin-bottom: 2.5rem;
+            opacity: 0;
+            animation: fadeUp .5s ease forwards .15s;
+        }
+
+        /* ─── LOADING ─────────────────────────────── */
+        #stateLoading { display: block; }
+        .spinner {
+            width: 64px; height: 64px;
+            border: 4px solid rgba(59,130,246,.15);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin .75s linear infinite;
+            margin: 0 auto 1.75rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-label {
+            font-size: .75rem;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: .15em;
+        }
+
+        /* ─── ICON ────────────────────────────────── */
+        #stateSuccess, #stateError { display: none; }
+
+        .icon-wrap {
+            width: 130px; height: 130px;
+            margin: 0 auto 2rem;
+            opacity: 0;
+            animation: scaleIn .55s cubic-bezier(.34,1.56,.64,1) forwards .5s;
+        }
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(.4); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+
+        /* animated circle */
+        .ring {
+            fill: none;
+            stroke-width: 3;
+            stroke-dasharray: 283;
+            stroke-dashoffset: 283;
+            animation: drawRing .7s ease forwards 1s;
+        }
+        .ring.green  { stroke: var(--accent-green); }
+        .ring.orange { stroke: var(--accent-orange); }
+
+        @keyframes drawRing { to { stroke-dashoffset: 0; } }
+
+        /* checkmark */
+        .check {
+            fill: none;
+            stroke: var(--accent-green);
+            stroke-width: 5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-dasharray: 65;
+            stroke-dashoffset: 65;
+            animation: drawCheck .4s ease forwards 1.7s;
+        }
+        @keyframes drawCheck { to { stroke-dashoffset: 0; } }
+
+        /* X mark */
+        .xline {
+            stroke: var(--accent-orange);
+            stroke-width: 5;
+            stroke-linecap: round;
+            stroke-dasharray: 50;
+            stroke-dashoffset: 50;
+            animation: drawCheck .35s ease forwards;
+        }
+        .xline:nth-child(3) { animation-delay: 1.7s; }
+        .xline:nth-child(4) { animation-delay: 2.0s; }
+
+        /* ─── TEXT ────────────────────────────────── */
+        .headline {
+            font-size: 2.25rem;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: .6rem;
+            opacity: 0;
+            animation: fadeUp .5s ease forwards 2s;
+        }
+        .sub {
+            font-size: 1rem;
+            color: #94a3b8;
+            line-height: 1.6;
+            margin-bottom: 2.5rem;
+            opacity: 0;
+            animation: fadeUp .5s ease forwards 2.15s;
+        }
+
+        /* ─── COUNTDOWN ───────────────────────────── */
+        .countdown-wrap {
+            opacity: 0;
+            animation: fadeUp .5s ease forwards 2.3s;
+        }
+        .bar-track {
+            height: 5px;
+            background: rgba(255,255,255,.07);
+            border-radius: 99px;
+            overflow: hidden;
+            margin-bottom: .5rem;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 99px;
+            width: 100%;
+        }
+        .bar-fill.green  { background: var(--accent-green); }
+        .bar-fill.orange { background: var(--accent-orange); }
+        .bar-label {
+            font-size: .68rem;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: .12em;
+        }
+
+        /* ─── ERROR BTN ───────────────────────────── */
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            padding: .875rem 2rem;
+            background: rgba(249,115,22,.12);
+            border: 1px solid rgba(249,115,22,.3);
+            color: var(--accent-orange);
+            font-weight: 700;
+            border-radius: .875rem;
+            cursor: pointer;
+            font-size: .9rem;
+            transition: background .2s, transform .1s;
+            opacity: 0;
+            animation: fadeUp .5s ease forwards 2.3s;
+        }
+        .back-btn:hover { background: rgba(249,115,22,.22); }
+        .back-btn:active { transform: scale(.97); }
+
+        /* ─── KEYFRAMES ───────────────────────────── */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(14px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="glow-bg green"  id="glowGreen"></div>
+    <div class="glow-bg orange" id="glowOrange"></div>
+    <canvas id="particles"></canvas>
+
+    <div class="content">
+
+        <!-- LOGO (shared) -->
+        <div class="logo">
+            <span style="color:#3b82f6">Vez</span><span>clic</span><span style="color:#f97316">!</span>
+        </div>
+
+        <!-- ════════ LOADING ════════ -->
+        <div id="stateLoading">
+            <div class="spinner"></div>
+            <p class="loading-label" id="loadingMsg">Verificando sessão...</p>
+        </div>
+
+        <!-- ════════ SUCCESS ════════ -->
+        <div id="stateSuccess">
+            <div class="icon-wrap">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="46" fill="rgba(34,197,94,.08)"/>
+                    <circle class="ring green" cx="50" cy="50" r="44" transform="rotate(-90 50 50)"/>
+                    <polyline class="check" points="27,51 42,67 73,34"/>
+                </svg>
+            </div>
+            <h1 class="headline" style="color:var(--accent-green)" id="successHeadline">Tudo certo!</h1>
+            <p  class="sub" id="successSub">Empresa registrada com sucesso.</p>
+            <div class="countdown-wrap">
+                <div class="bar-track">
+                    <div class="bar-fill green" id="barFill"></div>
+                </div>
+                <p class="bar-label" id="barLabel">Redirecionando...</p>
+            </div>
+        </div>
+
+        <!-- ════════ ERROR ════════ -->
+        <div id="stateError">
+            <div class="icon-wrap">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="46" fill="rgba(249,115,22,.08)"/>
+                    <circle class="ring orange" cx="50" cy="50" r="44" transform="rotate(-90 50 50)"/>
+                    <line class="xline" x1="32" y1="32" x2="68" y2="68"/>
+                    <line class="xline" x1="68" y1="32" x2="32" y2="68"/>
+                </svg>
+            </div>
+            <h1 class="headline" style="color:var(--accent-orange)">Algo deu errado</h1>
+            <p  class="sub" id="errorMsg">Não foi possível salvar os dados.</p>
+            <button class="back-btn" onclick="goBack()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <polyline points="15 18 9 12 15 6"/>
+                </svg>
+                Voltar e tentar novamente
+            </button>
+        </div>
+
+    </div><!-- /content -->
+
+    <script>
+    // ══════════════════════════════════════════════
+    // SUPABASE
+    // ══════════════════════════════════════════════
+    const SUPABASE_URL = 'https://nojkeyqycpvnolnuzwnj.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_v16thezDVJS97xDtzo8SmA_X9tz3G4M';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // ══════════════════════════════════════════════
+    // INIT
+    // ══════════════════════════════════════════════
+    async function init() {
+        setMsg('Verificando sessão...');
+
+        // Supabase JS v2 processes the OAuth hash automatically
+        const { data: { session }, error: sErr } = await db.auth.getSession();
+
+        if (sErr || !session) {
+            showError('Sessão não encontrada. Faça o login novamente.');
+            return;
+        }
+
+        const raw = localStorage.getItem('vezclic_pending');
+        if (!raw) {
+            showError('Nenhum dado de cadastro encontrado. Volte e preencha o formulário.');
+            return;
+        }
+
+        setMsg('Salvando empresa...');
+        try {
+            const data = JSON.parse(raw);
+            await saveRegistration(data);
+            localStorage.removeItem('vezclic_pending');
+            showSuccess(data.brand);
+        } catch (err) {
+            console.error('[Vezclic]', err);
+            showError(err.message || 'Erro desconhecido. Tente novamente.');
+        }
+    }
+
+    // ══════════════════════════════════════════════
+    // SAVE TO SUPABASE
+    // ══════════════════════════════════════════════
+    async function saveRegistration(data) {
+        const { data: empresa, error: e1 } = await db
+            .from('empresas')
+            .insert({ empresa: data.brand, whatsapp: data.whatsapp })
+            .select().single();
+        if (e1) throw new Error('Erro ao criar empresa: ' + e1.message);
+
+        const eid = empresa.id;
+
+        const { error: e2 } = await db.from('servicos').insert({
+            eid, servico: data.serviceName, tempo: data.tempo, valor: data.price,
+        });
+        if (e2) throw new Error('Erro ao criar serviço: ' + e2.message);
+
+        const rows = [];
+        for (const day of data.days) {
+            if (data.lunchVisible && data.lunchStart && data.lunchEnd) {
+                const dS = parseInt(day.start),   dE = parseInt(day.end);
+                const lS = parseInt(data.lunchStart), lE = parseInt(data.lunchEnd);
+                if (lS > dS) rows.push({ eid, dia: day.dayIndex, inicio: day.start,      fim: data.lunchStart });
+                if (lE < dE) rows.push({ eid, dia: day.dayIndex, inicio: data.lunchEnd,  fim: day.end });
+            } else {
+                rows.push({ eid, dia: day.dayIndex, inicio: day.start, fim: day.end });
+            }
+        }
+
+        const { error: e3 } = await db.from('horarios').insert(rows);
+        if (e3) throw new Error('Erro ao salvar horários: ' + e3.message);
+    }
+
+    // ══════════════════════════════════════════════
+    // UI STATES
+    // ══════════════════════════════════════════════
+    function setMsg(msg) {
+        document.getElementById('loadingMsg').textContent = msg.toUpperCase();
+    }
+
+    function showSuccess(brand) {
+        document.getElementById('stateLoading').style.display = 'none';
+        document.getElementById('stateSuccess').style.display = 'block';
+        document.getElementById('successHeadline').textContent = brand + ' está no ar! 🎉';
+        document.getElementById('successSub').textContent =
+            'Empresa registrada com sucesso. Você já pode receber agendamentos pelo Vezclic.';
+
+        document.getElementById('glowGreen').classList.add('visible');
+        launchConfetti();
+        startCountdown(5);
+    }
+
+    function showError(msg) {
+        document.getElementById('stateLoading').style.display  = 'none';
+        document.getElementById('stateError').style.display    = 'block';
+        document.getElementById('errorMsg').textContent        = msg;
+        document.getElementById('glowOrange').classList.add('visible');
+    }
+
+    function goBack() {
+        const base = window.location.href.split('/').slice(0, -1).join('/');
+        window.location.href = base + '/Registar.html';
+    }
+
+    // ══════════════════════════════════════════════
+    // COUNTDOWN + REDIRECT
+    // ══════════════════════════════════════════════
+    function startCountdown(total) {
+        const bar   = document.getElementById('barFill');
+        const label = document.getElementById('barLabel');
+        let left    = total;
+
+        // Delay until after animations settle (~2.5 s)
+        setTimeout(() => {
+            bar.style.transition = `width ${total}s linear`;
+            bar.style.width = '0%';
+
+            label.textContent = `Redirecionando em ${left}s...`;
+            const iv = setInterval(() => {
+                left--;
+                label.textContent = left > 0
+                    ? `Redirecionando em ${left}s...`
+                    : 'Indo para o início...';
+                if (left <= 0) {
+                    clearInterval(iv);
+                    const base = window.location.href.split('/').slice(0, -1).join('/');
+                    window.location.href = base + '/index.html';
+                }
+            }, 1000);
+        }, 2500);
+    }
+
+    // ══════════════════════════════════════════════
+    // CONFETTI
+    // ══════════════════════════════════════════════
+    function launchConfetti() {
+        const canvas = document.getElementById('particles');
+        const ctx    = canvas.getContext('2d');
+        canvas.width  = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const colors = ['#3b82f6','#22c55e','#f97316','#a855f7','#ec4899','#facc15','#38bdf8'];
+        const shapes = ['rect','circle'];
+
+        const pieces = Array.from({ length: 140 }, () => ({
+            x:     Math.random() * canvas.width,
+            y:     -20 - Math.random() * canvas.height * .5,
+            vx:    (Math.random() - .5) * 5,
+            vy:    Math.random() * 3 + 2,
+            size:  Math.random() * 9 + 4,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            shape: shapes[Math.random() > .4 ? 0 : 1],
+            rot:   Math.random() * 360,
+            rotV:  (Math.random() - .5) * 9,
+            alpha: 1,
+        }));
+
+        let frame = 0;
+        const MAX = 240;
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (const p of pieces) {
+                p.x   += p.vx;
+                p.y   += p.vy;
+                p.vy  += .1;
+                p.rot += p.rotV;
+                p.alpha = Math.max(0, 1 - frame / MAX);
+
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle   = p.color;
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rot * Math.PI / 180);
+                if (p.shape === 'rect') {
+                    ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+            frame++;
+            if (frame < MAX) requestAnimationFrame(draw);
+            else ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Launch after the icon animation starts appearing (~1.8 s)
+        setTimeout(() => requestAnimationFrame(draw), 1800);
+    }
+
+    // ══════════════════════════════════════════════
+    init();
+    </script>
+</body>
+</html>
