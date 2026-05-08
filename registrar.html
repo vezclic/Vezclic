@@ -35,7 +35,7 @@
         }
         @media (min-width: 1024px) {
             .alpha-badge-desktop { display: block; }
-            .alpha-badge-mobile { display: none; }
+            .alpha-badge-mobile  { display: none; }
         }
         .input-field {
             background: #1e293b;
@@ -48,10 +48,19 @@
             outline: none;
             background: #334155;
         }
-        select option { background-color: #1e293b; color: white; }
-        .error-message { color: var(--accent-orange); font-size: 0.875rem; margin-top: 0.25rem; display: none; }
+        select option {
+            background-color: #1e293b;
+            color: white;
+        }
+        .error-message {
+            color: var(--accent-orange);
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+            display: none;
+        }
         .hidden-step { display: none; }
 
+        /* Loading overlay */
         #loadingOverlay {
             display: none;
             position: fixed;
@@ -65,12 +74,11 @@
         }
         #loadingOverlay.active { display: flex; }
         .spinner {
-            width: 52px;
-            height: 52px;
+            width: 52px; height: 52px;
             border: 4px solid rgba(59, 130, 246, 0.15);
             border-top-color: #3b82f6;
             border-radius: 50%;
-            animation: spin 0.75s linear infinite;
+            animation: spin .75s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -81,89 +89,114 @@
 </head>
 <body class="flex flex-col items-center p-4 md:p-8">
 
+    <!-- Loading Overlay -->
     <div id="loadingOverlay">
         <div class="spinner"></div>
-        <p id="loadingMsg" class="text-slate-300 text-sm font-bold tracking-widest uppercase">Processando...</p>
+        <p id="loadingMsg" class="text-slate-300 text-sm font-bold tracking-widest uppercase">Abrindo login...</p>
     </div>
 
+    <!-- Alpha Badge Desktop -->
     <div class="alpha-badge-desktop">VERSÃO DE TESTE<br>0.0.0.1</div>
+
+    <!-- Alpha Badge Mobile -->
     <div class="alpha-badge-mobile w-full text-center py-2 text-xs font-bold tracking-widest opacity-50 uppercase mb-4">
         Versão Alpha 0.0.0.1
     </div>
 
     <main class="w-full max-w-xl z-10">
+
+        <!-- Logo -->
         <header class="text-center mb-12">
             <h1 class="text-5xl font-black tracking-tighter mb-1">
-                <span style="color: #3b82f6;">Vez</span><span class="text-white">clic</span><span style="color: #f97316;">!</span>
+                <span style="color:#3b82f6">Vez</span><span class="text-white">clic</span><span style="color:#f97316">!</span>
             </h1>
             <p class="text-xs font-bold tracking-[0.3em] text-slate-400">RESERVAS ONLINE</p>
         </header>
 
-        <!-- STEP 1 -->
+        <!-- ══════════════════════════════════ -->
+        <!-- STEP 1 — Dados da Empresa          -->
+        <!-- ══════════════════════════════════ -->
         <section id="step1" class="space-y-6">
             <div class="space-y-4">
+
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Sua Marca</label>
-                    <input type="text" id="brandName" placeholder="Nome da sua empresa" class="input-field w-full p-4 rounded-xl text-lg">
+                    <input type="text" id="brandName" placeholder="Nome da sua empresa"
+                           class="input-field w-full p-4 rounded-xl text-lg">
                     <p id="brandError" class="error-message">Por favor, insira ao menos 3 caracteres.</p>
                 </div>
 
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">WhatsApp</label>
-                    <input type="text" id="whatsapp" placeholder="(00) 00000-0000" class="input-field w-full p-4 rounded-xl text-lg">
+                    <input type="text" id="whatsapp" placeholder="(00) 00000-0000"
+                           class="input-field w-full p-4 rounded-xl text-lg">
                     <p id="whatsappError" class="error-message">Número de WhatsApp inválido.</p>
                 </div>
 
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Serviço Principal</label>
-                    <input type="text" id="serviceName" placeholder="Ex: Corte Social" class="input-field w-full p-4 rounded-xl text-lg">
+                    <input type="text" id="serviceName" placeholder="Ex: Corte Social"
+                           class="input-field w-full p-4 rounded-xl text-lg">
                     <p id="serviceError" class="error-message">Nome do serviço inválido.</p>
                 </div>
 
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Duração do Serviço</label>
                     <select id="tempo" class="input-field w-full p-4 rounded-xl text-lg">
-                        <option value="30" selected>30 minutos</option>
+                        <option value="30">30 minutos</option>
                         <option value="60">1 hora</option>
                         <option value="90">1h 30min</option>
                         <option value="120">2 horas</option>
                         <option value="150">2h 30min</option>
                         <option value="180">3 horas</option>
+                        <option value="210">3h 30min</option>
+                        <option value="240">4 horas</option>
+                        <option value="270">4h 30min</option>
+                        <option value="300">5 horas</option>
+                        <option value="330">5h 30min</option>
+                        <option value="360">6 horas</option>
                     </select>
                 </div>
 
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Valor</label>
-                    <input type="text" id="servicePrice" placeholder="R$ 0,00" class="input-field w-full p-4 rounded-xl text-lg">
+                    <input type="text" id="servicePrice" placeholder="R$ 0,00"
+                           class="input-field w-full p-4 rounded-xl text-lg">
                     <p id="priceError" class="error-message">O valor não pode exceder R$ 1.000,00.</p>
                 </div>
+
             </div>
 
-            <button onclick="nextStep()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-5 rounded-2xl text-xl shadow-lg shadow-blue-900/20 transition-all active:scale-[0.98]">
+            <button onclick="nextStep()"
+                    class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-5 rounded-2xl text-xl shadow-lg shadow-blue-900/20 transition-all active:scale-[0.98]">
                 CONTINUAR
             </button>
         </section>
 
-        <!-- STEP 2 -->
+        <!-- ══════════════════════════════════ -->
+        <!-- STEP 2 — Horários                  -->
+        <!-- ══════════════════════════════════ -->
         <section id="step2" class="hidden-step space-y-8">
             <div class="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
                 <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
                     <span class="w-2 h-6 bg-blue-500 rounded-full"></span>
                     Configurar Horários
                 </h3>
+                <p class="text-sm text-slate-400 mb-6">Selecione os dias que você atende:</p>
 
-                <p class="text-sm text-slate-400 mb-6">Selecione os dias de atendimento:</p>
                 <div id="daysContainer" class="flex flex-wrap gap-2 mb-8"></div>
                 <div id="timeConfigContainer" class="space-y-4 mb-6"></div>
 
+                <!-- Secret Lunch Button -->
                 <div class="flex justify-center mb-6">
-                    <button id="secretLunchBtn" onclick="toggleLunchAll()" class="text-[10px] uppercase tracking-[0.2em] text-slate-600 hover:text-orange-400 transition-colors">
+                    <button id="secretLunchBtn" onclick="toggleLunchAll()"
+                            class="text-[10px] uppercase tracking-[0.2em] text-slate-600 hover:text-orange-400 transition-colors">
                         [ + adicionar intervalo de almoço ]
                     </button>
                 </div>
 
                 <div id="lunchConfigContainer" class="hidden space-y-4 p-4 border-t border-white/5 mt-4">
-                    <p class="text-xs font-bold text-orange-400 uppercase tracking-widest text-center">Almoço Geral</p>
+                    <p class="text-xs font-bold text-orange-400 uppercase tracking-widest text-center">Horário de Almoço Geral</p>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-[10px] uppercase text-slate-500 block mb-1 text-center">Início</label>
@@ -174,14 +207,17 @@
                             <select id="lunchEnd" class="input-field w-full p-3 rounded-lg text-sm"></select>
                         </div>
                     </div>
-                    <p id="lunchError" class="error-message text-center">Almoço inválido.</p>
+                    <p id="lunchError" class="error-message text-center">O fim do almoço deve ser após o início.</p>
                 </div>
             </div>
 
-            <p id="step2GlobalError" class="error-message text-center text-base">Corrija os horários antes de continuar.</p>
+            <p id="step2GlobalError" class="error-message text-center text-base">
+                Corrija os horários inválidos antes de continuar.
+            </p>
 
-            <button id="registerBtn" class="hidden w-full bg-white text-black font-black py-5 rounded-2xl text-xl flex items-center justify-center gap-3 shadow-xl hover:bg-slate-100 transition-all active:scale-[0.98]">
-                <svg class="w-6 h-6" viewBox="0 0 24 24">
+            <button id="registerBtn"
+                    class="hidden w-full bg-white text-black font-black py-5 rounded-2xl text-xl flex items-center justify-center gap-3 shadow-xl hover:bg-slate-100 transition-all active:scale-[0.98]">
+                <svg class="w-6 h-6 flex-shrink-0" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -191,235 +227,264 @@
             </button>
         </section>
 
-        <!-- SUCCESS/ERROR -->
-        <section id="stepSuccess" class="hidden-step text-center space-y-6 py-16">
-            <div class="text-7xl mb-2">🎉</div>
-            <h2 class="text-3xl font-black text-green-400">Empresa Registrada!</h2>
-            <p id="successMsg" class="text-slate-300 text-lg"></p>
-            <p class="text-slate-500 text-sm">Pronto para receber agendamentos.</p>
-        </section>
-
-        <section id="stepError" class="hidden-step text-center space-y-6 py-16">
-            <div class="text-7xl mb-2">⚠️</div>
-            <h2 class="text-2xl font-black text-orange-400">Algo deu errado</h2>
-            <p id="errorMsg" class="text-slate-300 text-base px-4"></p>
-            <button onclick="resetToStart()" class="px-8 py-3 bg-blue-600 rounded-xl font-bold hover:bg-blue-500">Tentar Novamente</button>
-        </section>
     </main>
 
     <footer class="mt-12 text-slate-500 text-sm py-8">
-        <a href="https://instagram.com/lucas_kea" target="_blank" class="hover:text-blue-400 flex items-center gap-2">
+        <a href="https://instagram.com/lucas_kea" target="_blank"
+           class="hover:text-blue-400 transition-colors flex items-center gap-2">
             Desenvolvido por <span class="font-bold">@lucas_kea</span>
         </a>
     </footer>
 
     <script>
-        const SUPABASE_URL = 'https://nojkeyqycpvnolnuzwnj.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_v16thezDVJS97xDtzo8SmA_X9tz3G4M';
-        const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // ══════════════════════════════════════════════
+    // SUPABASE
+    // ══════════════════════════════════════════════
+    const SUPABASE_URL = 'https://nojkeyqycpvnolnuzwnj.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_v16thezDVJS97xDtzo8SmA_X9tz3G4M';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const daysOfWeek = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
-        let selectedDays = new Set();
-        let lunchVisible = false;
+    // ══════════════════════════════════════════════
+    // CONSTANTS & STATE
+    // ══════════════════════════════════════════════
+    const daysOfWeek   = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+    const prepositions = ['de', 'da', 'do', 'com', 'em', 'para', 'e', 'a', 'o'];
+    let selectedDays = new Set();
+    let lunchVisible = false;
 
-        // --- Helpers ---
-        const timeToMin = (t) => {
-            const [h, m] = t.split(':').map(Number);
-            return h * 60 + m;
+    // ══════════════════════════════════════════════
+    // INPUT FORMATTING
+    // ══════════════════════════════════════════════
+    const brandInput = document.getElementById('brandName');
+    brandInput.addEventListener('input', e => {
+        let v = e.target.value.substring(0, 30);
+        e.target.value = v.split(' ')
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(' ');
+    });
+
+    const whatsappInput = document.getElementById('whatsapp');
+    whatsappInput.addEventListener('input', e => {
+        let x = e.target.value.replace(/\D/g, '').match(/(\d{0,2})(\d{0,5})(\d{0,4})/);
+        e.target.value = !x[2] ? x[1] : '(' + x[1] + ') ' + x[2] + (x[3] ? '-' + x[3] : '');
+    });
+
+    const serviceInput = document.getElementById('serviceName');
+    serviceInput.addEventListener('input', e => {
+        let v = e.target.value.substring(0, 30);
+        e.target.value = v.split(' ').map((w, i) => {
+            if (i > 0 && prepositions.includes(w.toLowerCase())) return w.toLowerCase();
+            return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+        }).join(' ');
+    });
+
+    const priceInput = document.getElementById('servicePrice');
+    priceInput.addEventListener('input', e => {
+        let val = e.target.value.replace(/\D/g, '');
+        if (parseInt(val) > 100000) val = '100000';
+        let f = (parseInt(val) || 0) / 100;
+        e.target.value = f.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    });
+
+    // ══════════════════════════════════════════════
+    // STEP 1 — VALIDATION
+    // ══════════════════════════════════════════════
+    function setError(id, show) {
+        document.getElementById(id).style.display = show ? 'block' : 'none';
+    }
+
+    function nextStep() {
+        const bVal = brandInput.value.trim();
+        const wVal = whatsappInput.value.replace(/\D/g, '');
+        const sVal = serviceInput.value.trim();
+        const pVal = parseFloat((parseInt(priceInput.value.replace(/\D/g, '')) / 100).toFixed(2));
+
+        setError('brandError',    bVal.length < 3);
+        setError('whatsappError', wVal.length < 10);
+        setError('serviceError',  sVal.length < 3);
+        setError('priceError',    isNaN(pVal) || pVal > 1000);
+
+        const ok = bVal.length >= 3 && wVal.length >= 10 && sVal.length >= 3 && !isNaN(pVal) && pVal <= 1000;
+        if (ok) {
+            document.getElementById('step1').classList.add('hidden-step');
+            document.getElementById('step2').classList.remove('hidden-step');
+            renderDays();
+        }
+    }
+
+    // ══════════════════════════════════════════════
+    // STEP 2 — DAYS & TIMES
+    // ══════════════════════════════════════════════
+    function renderDays() {
+        const c = document.getElementById('daysContainer');
+        c.innerHTML = '';
+        daysOfWeek.forEach(day => {
+            const btn = document.createElement('button');
+            btn.className = `day-toggle px-4 py-2 rounded-xl border border-white/10 text-sm font-bold transition-all
+                ${selectedDays.has(day) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white/5 text-slate-400'}`;
+            btn.innerText = day;
+            btn.onclick = () => toggleDay(day);
+            c.appendChild(btn);
+        });
+        renderTimeConfigs();
+    }
+
+    function toggleDay(day) {
+        selectedDays.has(day) ? selectedDays.delete(day) : selectedDays.add(day);
+        renderDays();
+    }
+
+    function renderTimeConfigs() {
+        const c   = document.getElementById('timeConfigContainer');
+        const btn = document.getElementById('registerBtn');
+        c.innerHTML = '';
+        const sorted = daysOfWeek.filter(d => selectedDays.has(d));
+        btn.classList.toggle('hidden', sorted.length === 0);
+
+        sorted.forEach(day => {
+            const div = document.createElement('div');
+            div.className = 'flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-white/5 rounded-2xl border border-white/5';
+            div.dataset.day = day;
+            div.innerHTML = `
+                <span class="font-bold text-blue-400 w-24">${day}</span>
+                <div class="flex items-center gap-3">
+                    <select class="time-start input-field p-2 rounded-lg text-sm w-28">${generateTimeOptions('08:00')}</select>
+                    <span class="text-slate-600 text-xs font-bold">ATÉ</span>
+                    <select class="time-end input-field p-2 rounded-lg text-sm w-28">${generateTimeOptions('18:00')}</select>
+                </div>
+                <p class="day-time-error error-message text-xs">Fim deve ser após o início.</p>
+            `;
+            c.appendChild(div);
+        });
+    }
+
+    function generateTimeOptions(selected) {
+        let o = '';
+        for (let i = 0; i < 24; i++) {
+            const t = `${i.toString().padStart(2,'0')}:00`;
+            o += `<option value="${t}" ${t === selected ? 'selected' : ''}>${t}</option>`;
+        }
+        return o;
+    }
+
+    // ══════════════════════════════════════════════
+    // LUNCH
+    // ══════════════════════════════════════════════
+    function toggleLunchAll() {
+        lunchVisible = !lunchVisible;
+        const c = document.getElementById('lunchConfigContainer');
+        if (lunchVisible) {
+            c.classList.remove('hidden');
+            document.getElementById('lunchStart').innerHTML = generateTimeOptions('11:00');
+            document.getElementById('lunchEnd').innerHTML   = generateTimeOptions('12:00');
+        } else {
+            c.classList.add('hidden');
+            document.getElementById('lunchError').style.display = 'none';
+        }
+    }
+
+    function checkLunchValid() {
+        if (!lunchVisible) return true;
+        const s = parseInt(document.getElementById('lunchStart').value);
+        const e = parseInt(document.getElementById('lunchEnd').value);
+        const bad = e <= s;
+        document.getElementById('lunchError').style.display = bad ? 'block' : 'none';
+        return !bad;
+    }
+
+    document.getElementById('lunchStart').addEventListener('change', checkLunchValid);
+    document.getElementById('lunchEnd').addEventListener('change', checkLunchValid);
+
+    // ══════════════════════════════════════════════
+    // VALIDATE TIMES
+    // ══════════════════════════════════════════════
+    function validateTimes() {
+        let valid = true;
+        document.querySelectorAll('#timeConfigContainer > div').forEach(row => {
+            const sH = parseInt(row.querySelector('.time-start').value);
+            const eH = parseInt(row.querySelector('.time-end').value);
+            const bad = eH <= sH;
+            row.querySelector('.time-end').style.borderColor = bad ? 'var(--accent-orange)' : 'rgba(255,255,255,0.1)';
+            const err = row.querySelector('.day-time-error');
+            if (err) err.style.display = bad ? 'block' : 'none';
+            if (bad) valid = false;
+        });
+        if (!checkLunchValid()) valid = false;
+        return valid;
+    }
+
+    // ══════════════════════════════════════════════
+    // COLLECT FORM DATA
+    // ══════════════════════════════════════════════
+    function collectFormData() {
+        const sorted = daysOfWeek.filter(d => selectedDays.has(d));
+        const rows   = document.querySelectorAll('#timeConfigContainer > div');
+
+        const days = sorted.map((day, i) => ({
+            dayIndex: daysOfWeek.indexOf(day),
+            dayName:  day,
+            start:    rows[i].querySelector('.time-start').value + ':00',
+            end:      rows[i].querySelector('.time-end').value   + ':00',
+        }));
+
+        return {
+            brand:       brandInput.value.trim(),
+            whatsapp:    whatsappInput.value.replace(/\D/g, ''),
+            serviceName: serviceInput.value.trim(),
+            tempo:       parseInt(document.getElementById('tempo').value),
+            price:       parseFloat((parseInt(priceInput.value.replace(/\D/g, '')) / 100).toFixed(2)),
+            days,
+            lunchVisible,
+            lunchStart: lunchVisible ? document.getElementById('lunchStart').value + ':00' : null,
+            lunchEnd:   lunchVisible ? document.getElementById('lunchEnd').value   + ':00' : null,
         };
+    }
 
-        const generateTimeOptions = (selected) => {
-            let options = '';
-            for (let i = 0; i < 24 * 60; i += 30) {
-                const h = Math.floor(i / 60).toString().padStart(2, '0');
-                const m = (i % 60).toString().padStart(2, '0');
-                const time = `${h}:${m}`;
-                options += `<option value="${time}" ${time === selected ? 'selected' : ''}>${time}</option>`;
-            }
-            return options;
-        };
+    // ══════════════════════════════════════════════
+    // REGISTER — store data → Google OAuth
+    //
+    // redirectTo aponta para callback.html na mesma
+    // pasta que este arquivo. Adicione essa URL em:
+    // Supabase → Authentication → URL Configuration → Redirect URLs
+    // ══════════════════════════════════════════════
+    document.getElementById('registerBtn').onclick = async () => {
+        if (!validateTimes()) {
+            document.getElementById('step2GlobalError').style.display = 'block';
+            return;
+        }
+        document.getElementById('step2GlobalError').style.display = 'none';
 
-        // --- Form Formatting ---
-        document.getElementById('whatsapp').addEventListener('input', (e) => {
-            let x = e.target.value.replace(/\D/g, '').match(/(\d{0,2})(\d{0,5})(\d{0,4})/);
-            e.target.value = !x[2] ? x[1] : '(' + x[1] + ') ' + x[2] + (x[3] ? '-' + x[3] : '');
+        localStorage.setItem('vezclic_pending', JSON.stringify(collectFormData()));
+
+        showLoading('Abrindo login do Google...');
+
+        // Resolve callback.html relative to this file
+        const base       = window.location.href.split('/').slice(0, -1).join('/');
+        const redirectTo = base + '/callback.html';
+
+        const { error } = await db.auth.signInWithOAuth({
+            provider: 'google',
+            options:  { redirectTo },
         });
 
-        document.getElementById('servicePrice').addEventListener('input', (e) => {
-            let value = e.target.value.replace(/\D/g, '');
-            if (parseInt(value) > 100000) value = '100000';
-            let floatValue = (parseInt(value) || 0) / 100;
-            e.target.value = floatValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        });
-
-        // --- Step Navigation ---
-        function nextStep() {
-            const bVal = document.getElementById('brandName').value.trim();
-            const wVal = document.getElementById('whatsapp').value.replace(/\D/g, '');
-            const sVal = document.getElementById('serviceName').value.trim();
-            const pVal = parseFloat((parseInt(document.getElementById('servicePrice').value.replace(/\D/g, '')) / 100).toFixed(2));
-
-            let hasError = bVal.length < 3 || wVal.length < 10 || sVal.length < 3 || isNaN(pVal) || pVal > 1000;
-
-            document.getElementById('brandError').style.display = bVal.length < 3 ? 'block' : 'none';
-            document.getElementById('whatsappError').style.display = wVal.length < 10 ? 'block' : 'none';
-            document.getElementById('serviceError').style.display = sVal.length < 3 ? 'block' : 'none';
-            document.getElementById('priceError').style.display = (isNaN(pVal) || pVal > 1000) ? 'block' : 'none';
-
-            if (!hasError) {
-                document.getElementById('step1').classList.add('hidden-step');
-                document.getElementById('step2').classList.remove('hidden-step');
-                renderDays();
-            }
+        if (error) {
+            hideLoading();
+            localStorage.removeItem('vezclic_pending');
+            alert('Erro ao abrir login do Google: ' + error.message);
         }
+        // Se OK, o browser já redirecionou — nenhum código adicional roda aqui.
+    };
 
-        function renderDays() {
-            const container = document.getElementById('daysContainer');
-            container.innerHTML = '';
-            daysOfWeek.forEach(day => {
-                const btn = document.createElement('button');
-                btn.className = `px-4 py-2 rounded-xl border border-white/10 text-sm font-bold transition-all ${selectedDays.has(day) ? 'bg-blue-600 text-white' : 'bg-white/5 text-slate-400'}`;
-                btn.innerText = day;
-                btn.onclick = () => {
-                    selectedDays.has(day) ? selectedDays.delete(day) : selectedDays.add(day);
-                    renderDays();
-                    renderTimeConfigs();
-                };
-                container.appendChild(btn);
-            });
-        }
-
-        function renderTimeConfigs() {
-            const container = document.getElementById('timeConfigContainer');
-            const registerBtn = document.getElementById('registerBtn');
-            container.innerHTML = '';
-            const sorted = daysOfWeek.filter(d => selectedDays.has(d));
-            registerBtn.classList.toggle('hidden', sorted.length === 0);
-
-            sorted.forEach(day => {
-                const div = document.createElement('div');
-                div.className = 'flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-white/5 rounded-2xl border border-white/5';
-                div.innerHTML = `
-                    <span class="font-bold text-blue-400 w-24">${day}</span>
-                    <div class="flex items-center gap-3">
-                        <select class="time-start input-field p-2 rounded-lg text-sm w-28">${generateTimeOptions('08:00')}</select>
-                        <span class="text-slate-600 text-xs font-bold">ATÉ</span>
-                        <select class="time-end input-field p-2 rounded-lg text-sm w-28">${generateTimeOptions('18:00')}</select>
-                    </div>
-                    <p class="day-time-error error-message text-xs">Fim deve ser após o início.</p>`;
-                container.appendChild(div);
-            });
-        }
-
-        function toggleLunchAll() {
-            lunchVisible = !lunchVisible;
-            const container = document.getElementById('lunchConfigContainer');
-            container.classList.toggle('hidden', !lunchVisible);
-            if (lunchVisible) {
-                document.getElementById('lunchStart').innerHTML = generateTimeOptions('12:00');
-                document.getElementById('lunchEnd').innerHTML = generateTimeOptions('13:00');
-            }
-        }
-
-        // --- Save Logic ---
-        async function handlePendingRegistration() {
-            const pendingRaw = localStorage.getItem('vezclic_pending');
-            if (!pendingRaw) return;
-
-            showLoading('Finalizando cadastro...');
-            try {
-                const data = JSON.parse(pendingRaw);
-                const { data: { user } } = await db.auth.getUser();
-                if (!user) throw new Error("Usuário não autenticado.");
-
-                // 1. Empresa
-                const { data: empresa, error: empErr } = await db.from('empresas')
-                    .insert({ empresa: data.brand, whatsapp: data.whatsapp, user_id: user.id })
-                    .select().single();
-                if (empErr) throw empErr;
-
-                // 2. Serviço
-                await db.from('servicos').insert({ eid: empresa.id, servico: data.serviceName, tempo: data.tempo, valor: data.price });
-
-                // 3. Horários
-                const horarios = [];
-                data.days.forEach(day => {
-                    const dStart = timeToMin(day.start);
-                    const dEnd = timeToMin(day.end);
-
-                    if (data.lunchVisible) {
-                        const lStart = timeToMin(data.lunchStart);
-                        const lEnd = timeToMin(data.lunchEnd);
-                        if (lStart > dStart) horarios.push({ eid: empresa.id, dia: day.dayIndex, inicio: day.start, fim: data.lunchStart });
-                        if (lEnd < dEnd) horarios.push({ eid: empresa.id, dia: day.dayIndex, inicio: data.lunchEnd, fim: day.end });
-                    } else {
-                        horarios.push({ eid: empresa.id, dia: day.dayIndex, inicio: day.start, fim: day.end });
-                    }
-                });
-                await db.from('horarios').insert(horarios);
-
-                localStorage.removeItem('vezclic_pending');
-                showSuccess(data.brand);
-            } catch (err) {
-                showError(err.message);
-            } finally {
-                hideLoading();
-            }
-        }
-
-        document.getElementById('registerBtn').onclick = async () => {
-            const rows = document.querySelectorAll('#timeConfigContainer > div');
-            let valid = true;
-            
-            rows.forEach(row => {
-                const s = timeToMin(row.querySelector('.time-start').value);
-                const e = timeToMin(row.querySelector('.time-end').value);
-                const bad = e <= s;
-                row.querySelector('.day-time-error').style.display = bad ? 'block' : 'none';
-                if (bad) valid = false;
-            });
-
-            if (lunchVisible) {
-                const ls = timeToMin(document.getElementById('lunchStart').value);
-                const le = timeToMin(document.getElementById('lunchEnd').value);
-                if (le <= ls) { valid = false; document.getElementById('lunchError').style.display = 'block'; }
-            }
-
-            if (!valid) return;
-
-            const sorted = daysOfWeek.filter(d => selectedDays.has(d));
-            const formData = {
-                brand: document.getElementById('brandName').value,
-                whatsapp: document.getElementById('whatsapp').value.replace(/\D/g, ''),
-                serviceName: document.getElementById('serviceName').value,
-                tempo: parseInt(document.getElementById('tempo').value),
-                price: parseFloat((parseInt(document.getElementById('servicePrice').value.replace(/\D/g, '')) / 100).toFixed(2)),
-                lunchVisible,
-                lunchStart: lunchVisible ? document.getElementById('lunchStart').value : null,
-                lunchEnd: lunchVisible ? document.getElementById('lunchEnd').value : null,
-                days: Array.from(document.querySelectorAll('#timeConfigContainer > div')).map(row => ({
-                    dayIndex: daysOfWeek.indexOf(row.querySelector('span').innerText),
-                    start: row.querySelector('.time-start').value,
-                    end: row.querySelector('.time-end').value
-                }))
-            };
-
-            localStorage.setItem('vezclic_pending', JSON.stringify(formData));
-            showLoading('Conectando ao Google...');
-            await db.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href.split('?')[0] } });
-        };
-
-        // --- Init ---
-        document.addEventListener('DOMContentLoaded', async () => {
-            const { data: { session } } = await db.auth.getSession();
-            if (session) await handlePendingRegistration();
-        });
-
-        function showLoading(m) { document.getElementById('loadingMsg').innerText = m.toUpperCase(); document.getElementById('loadingOverlay').classList.add('active'); }
-        function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
-        function showSuccess(b) { document.getElementById('step2').classList.add('hidden-step'); document.getElementById('stepSuccess').classList.remove('hidden-step'); document.getElementById('successMsg').innerText = `"${b}" cadastrada!`; }
-        function showError(m) { document.getElementById('step2').classList.add('hidden-step'); document.getElementById('stepError').classList.remove('hidden-step'); document.getElementById('errorMsg').innerText = m; }
-        function resetToStart() { document.getElementById('stepError').classList.add('hidden-step'); document.getElementById('step1').classList.remove('hidden-step'); }
+    // ══════════════════════════════════════════════
+    // UI HELPERS
+    // ══════════════════════════════════════════════
+    function showLoading(msg) {
+        document.getElementById('loadingMsg').textContent = msg.toUpperCase();
+        document.getElementById('loadingOverlay').classList.add('active');
+    }
+    function hideLoading() {
+        document.getElementById('loadingOverlay').classList.remove('active');
+    }
     </script>
 </body>
 </html>
