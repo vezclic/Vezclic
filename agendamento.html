@@ -9,7 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2 family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
         :root { --primary-color: #0f172a; }
@@ -184,9 +184,6 @@
     </div>
 
     <script>
-        // ══════════════════════════════════════════════
-        // CONEXÃO COM O SEU BANCO DE DADOS SUPABASE
-        // ══════════════════════════════════════════════
         const supabaseUrl = 'https://nojkeyqycpvnolnuzwnj.supabase.co';
         const supabaseKey = 'sb_publishable_v16thezDVJS97xDtzo8SmA_X9tz3G4M';
         const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
@@ -268,7 +265,8 @@
                 
                 selectedProName = hasColaboradores ? "" : nomeEmpresa;
 
-                const { data: servs = [] } = await supabaseClient.from('servicos').select('*').eq('empresa_id', companyId);
+                // ALTERADO: Puxa usando a coluna correta 'eid' mapeada do seu banco de dados
+                const { data: servs = [] } = await supabaseClient.from('servicos').select('*').eq('eid', companyId);
                 renderServices(servs || []);
                 
                 const { data: hrs = [] } = await supabaseClient.from('horarios').select('*').eq('empresa_id', companyId);
@@ -439,22 +437,22 @@
             generateCalendar(8, true);
         }
 
+        // ALTERADO: Mapeado as variáveis internas usando 'tempo', 'valor' e 'servico' vindos da sua tabela real
         function renderServices(list = []) {
             const container = document.getElementById('services-list');
             if(!list || !list.length) { container.innerHTML = "<p class='text-center text-slate-400 text-xs py-4'>Nenhum serviço cadastrado.</p>"; return; }
             
             container.innerHTML = list.map(s => {
-                const duracaoLimpa = parseInt(s.duracao) || 30;
+                const duracaoLimpa = parseInt(s.tempo) || 30;
                 return `
                 <div class="service-card relative transition-all duration-300">
-                    <input type="checkbox" id="srv-${s.id}" class="hidden service-checkbox" data-price="${s.preco}" data-time="${duracaoLimpa}" data-id="${s.id}">
+                    <input type="checkbox" id="srv-${s.id}" class="hidden service-checkbox" data-price="${s.valor}" data-time="${duracaoLimpa}" data-id="${s.id}">
                     <label for="srv-${s.id}" onclick="setTimeout(handleServiceChange, 50)" class="flex justify-between items-center p-5 cursor-pointer">
                         <div class="flex-1 min-w-0 pr-4 text-left">
-                            <p class="font-bold text-slate-800 text-sm uppercase tracking-tight">${s.nome}</p>
-                            ${s.descricao ? `<p class="text-[10px] text-slate-400 mt-1 font-medium truncate">${s.descricao}...</p>` : ''}
+                            <p class="font-bold text-slate-800 text-sm uppercase tracking-tight">${s.servico}</p>
                         </div>
                         <div class="flex flex-col items-end min-w-fit shrink-0">
-                            <span class="font-bold text-slate-900 text-sm tracking-tight">R$ ${parseFloat(s.preco).toFixed(2).replace('.',',')}</span>
+                            <span class="font-bold text-slate-900 text-sm tracking-tight">R$ ${parseFloat(s.valor).toFixed(2).replace('.',',')}</span>
                             <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">${duracaoLimpa} MIN</span>
                         </div>
                     </label>
