@@ -215,7 +215,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Data da Reserva</label>
-                    <input type="date" id="modal-agend-date" onchange="calculateManualAvailableSlots()" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-slate-200 outline-none focus:border-blue-500">
+                    <input type="date" id="modal-agend-date" onchange="calculateManualAvailableSlots()" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-slate-200 outline-none focus:border-blue-500"></select>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Horários Disponíveis no Mapa</label>
@@ -256,7 +256,7 @@
         const supabaseKey = 'sb_publishable_v16thezDVJS97xDtzo8SmA_X9tz3G4M';
         const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
-        let companyId = 8; // ID da sua empresa conforme visto na base
+        let companyId = null; // Ficará dinâmico a partir do banco de dados
         let currentTab = 'agendamentos';
         let isHorariosDirty = false;
         const daysOfWeek = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
@@ -298,14 +298,18 @@
             document.getElementById('agenda-date-filter').value = moment().format('YYYY-MM-DD');
             populateDurationDropdowns();
             
-            // EXECUÇÃO EM PARALELO: Evita que o erro de uma tabela trave o carregamento das outras
-            await Promise.all([
-                loadPerfil().catch(e => console.error("Erro Perfil:", e)),
-                loadServicos().catch(e => console.error("Erro Servicos:", e)),
-                loadHorariosView().catch(e => console.error("Erro Horarios:", e))
-            ]);
+            // 1. Executa primeiro o motor de busca dinâmico da empresa ativa
+            await loadPerfil().catch(e => console.error("Erro Perfil:", e));
             
-            await loadAgendamentos().catch(e => console.error("Erro Agendamentos:", e));
+            // 2. Se encontrou a empresa ativa, roda o carregamento assíncrono das tabelas dependentes
+            if (companyId) {
+                await Promise.all([
+                    loadServicos().catch(e => console.error("Erro Servicos:", e)),
+                    loadHorariosView().catch(e => console.error("Erro Horarios:", e))
+                ]);
+                await loadAgendamentos().catch(e => console.error("Erro Agendamentos:", e));
+            }
+            
             switchTab('agendamentos');
             document.getElementById('global-loader').classList.add('hidden');
         }
@@ -323,31 +327,53 @@
             currentTab = targetTab;
         }
 
+        // MOTOR DE BUSCA INTELIGENTE DE EMPRESA (EVITA EXIBIÇÃO EM BRANCO)
         async function loadPerfil() {
-            const { data, error } = await supabaseClient.from('empresas').select('*').eq('id', companyId).single();
-            if (!error && data) {
-                document.getElementById('config-empresa-name').value = data.empresa || "";
-                document.getElementById('config-empresa-slug').value = data.slug || "";
-                document.getElementById('config-empresa-logo').value = data.logo_url || "";
-                document.getElementById('config-empresa-bio').value = data.bio || "";
+            const urlParams = new URLSearchParams(window.location.search);
+            const slugOrId = urlParams.get('s') || urlParams.get('u') || urlParams.get('id');
+            
+            let query = supabaseClient.from('empresas').select('*');
+            
+            if (slugOrId) {
+                if (!isNaN(slugOrId)) {
+                    query = query.eq('id', parseInt(slugOrId));
+                } else {
+                    const nomeComEspaco = slugOrId.replace(/-/g, ' ');
+                    query = query.or(`empresa.ilike.%${slugOrId}%,empresa.ilike.%${nomeComEspaco}%,slug.ilike.%${slugOrId}%`);
+                }
+            } else {
+                // Se abrir sem parâmetro na URL, pega automaticamente a primeira empresa cadastrada no banco
+                query = query.order('id', { ascending: true }).limit(1);
+            }
+
+            const { data, error } = await query;
+
+            if (!error && data && data.length > 0) {
+                const currentCompany = data[0];
+                companyId = currentCompany.id;
+                companyData = currentCompany;
+
+                document.getElementById('config-empresa-name').value = currentCompany.empresa || "";
+                document.getElementById('config-empresa-slug').value = currentCompany.slug || "";
+                document.getElementById('config-empresa-logo').value = currentCompany.logo_url || "";
+                document.getElementById('config-empresa-bio').value = currentCompany.bio || "";
                 
-                // Fallback seguro caso o slug da coluna não venha preenchido de início
-                const identifier = data.slug ? data.slug.toLowerCase() : data.id;
+                const identifier = currentCompany.slug ? currentCompany.slug.toLowerCase() : currentCompany.id;
                 document.getElementById('link-display').innerText = `${window.location.host}/agendamento.html?s=${identifier}`;
             } else {
-                // Fallback se RLS bloquear ou não achar o registro 8
-                document.getElementById('link-display').innerText = `${window.location.host}/agendamento.html?s=${companyId}`;
+                document.getElementById('link-display').innerText = "Nenhuma empresa cadastrada";
             }
         }
 
         async function saveConfigPerfil() {
+            if(!companyId) return;
             const name = document.getElementById('config-empresa-name').value.trim();
             const slug = document.getElementById('config-empresa-slug').value.trim().toLowerCase().replace(/\s+/g, '-');
             const logo = document.getElementById('config-empresa-logo').value.trim();
             const bio = document.getElementById('config-empresa-bio').value.trim();
             
             const { error } = await supabaseClient.from('empresas').update({ empresa: name, slug: slug, logo_url: logo, bio: bio }).eq('id', companyId);
-            if (!error) { alert("Perfil empresarial atualizado!"); loadPerfil(); } else { alert(error.message); }
+            if (!error) { alert("Perfil empresarial atualizado!"); await loadPerfil(); } else { alert(error.message); }
         }
 
         function copyClientLink() {
@@ -356,6 +382,7 @@
         }
 
         async function loadAgendamentos() {
+            if(!companyId) return;
             const dateFilter = document.getElementById('agenda-date-filter').value;
             const container = document.getElementById('agendamentos-table-body');
             const { data } = await supabaseClient.from('agendamentos').select('*').eq('eid', companyId);
@@ -379,6 +406,7 @@
         }
 
         function openAppointmentModal() {
+            if(!companyId) return;
             document.getElementById('modal-agend-name').value = "";
             document.getElementById('modal-agend-phone').value = "";
             document.getElementById('modal-agend-date').value = moment().format('YYYY-MM-DD');
@@ -422,6 +450,7 @@
         }
 
         async function submitManualAppointment() {
+            if(!companyId) return;
             const name = document.getElementById('modal-agend-name').value.trim();
             const phone = document.getElementById('modal-agend-phone').value.replace(/\D/g,'');
             const idServico = document.getElementById('modal-agend-service').value;
@@ -431,10 +460,11 @@
             const timestamp = moment(`${date} ${time}`, "YYYY-MM-DD HH:mm").format("YYYY-MM-DD HH:mm:ss");
             
             const { error } = await supabaseClient.from('agendamentos').insert({ eid: companyId, cliente: name, whatsapp: phone, horario: timestamp, servicos_id: parseInt(idServico), status: 'confirmado' });
-            if (!error) { closeAppointmentModal(); loadAgendamentos(); } else { alert(error.message); }
+            if (!error) { closeAppointmentModal(); await loadAgendamentos(); } else { alert(error.message); }
         }
 
         async function loadServicos() {
+            if(!companyId) return;
             const grid = document.getElementById('services-grid');
             const { data } = await supabaseClient.from('servicos').select('*').eq('eid', companyId);
             allServices = data || [];
@@ -460,17 +490,18 @@
         function closeServiceModal() { document.getElementById('modal-servico').classList.add('hidden'); }
 
         async function submitServiceForm() {
+            if(!companyId) return;
             const id = document.getElementById('modal-servico-id').value;
             const name = document.getElementById('modal-servico-name').value.trim();
             const preco = parseFloat((parseInt(document.getElementById('modal-servico-price').value.replace(/\D/g, '')) || 0) / 100).toFixed(2);
             const tempo = parseInt(document.getElementById('modal-servico-duration').value);
             if (name.length < 3 || preco <= 0) return alert("Configurações inválidas!");
             let res = id ? await supabaseClient.from('servicos').update({ servico: name, valor: preco, tempo: tempo }).eq('id', id) : await supabaseClient.from('servicos').insert({ eid: companyId, servico: name, valor: preco, tempo: tempo });
-            if (!res.error) { closeServiceModal(); loadServicos(); }
+            if (!res.error) { closeServiceModal(); await loadServicos(); }
         }
 
         async function deleteServico(id) {
-            if (confirm("Deseja apagar este serviço?")) { await supabaseClient.from('servicos').delete().eq('id', id); loadServicos(); }
+            if (confirm("Deseja apagar este serviço?")) { await supabaseClient.from('servicos').delete().eq('id', id); await loadServicos(); }
         }
 
         async function loadHorariosView() {
@@ -496,6 +527,7 @@
         function markHorariosAsDirty() { isHorariosDirty = true; }
 
         async function saveAllHorarios() {
+            if(!companyId) return;
             document.getElementById('global-loader').classList.remove('hidden');
             await supabaseClient.from('horarios').delete().eq('eid', companyId);
             let inserts = [];
