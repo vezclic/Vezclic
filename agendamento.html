@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agendamento | Vezclic</title>
     
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
@@ -55,9 +55,10 @@
 </head>
 <body class="pb-32">
 
-    <div id="loading-screen" class="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center">
-        <div class="spinner mb-3"></div>
-        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest italic">buscando empresa...</p>
+    <!-- Tela de Carregamento / Erros Dinâmicos -->
+    <div id="loading-screen" class="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center p-6 text-center">
+        <div id="loader-spinner" class="spinner mb-3"></div>
+        <p id="loader-text" class="text-[11px] font-bold text-slate-400 uppercase tracking-widest italic">buscando empresa...</p>
     </div>
 
     <div id="app-content">
@@ -162,12 +163,14 @@
         </div>
     </div>
 
+    <!-- Mensagem de Sucesso -->
     <div id="step-success" class="fixed inset-0 bg-white z-[300] flex flex-col items-center justify-center p-8 text-center hidden">
         <div class="check-circle mb-6"><i class="ph ph-check text-white text-3xl font-bold"></i></div>
         <h2 class="text-2xl font-extrabold text-slate-900 mb-2 tracking-tight uppercase">Agendado!</h2>
         <p class="text-slate-500 text-sm font-medium">Abrindo WhatsApp...</p>
     </div>
 
+    <!-- Modal de Contato -->
     <div id="contact-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6 hidden">
         <div class="bg-white w-full max-w-xs rounded-3xl p-7 shadow-2xl">
             <h3 class="text-lg font-bold text-center mb-6 tracking-tight">Fale Conosco</h3>
@@ -185,7 +188,7 @@
 
     <script>
         // ══════════════════════════════════════════════
-        // CONFIGURAÇÕES DO SEU SUPABASE ATUALIZADAS
+        // CONEXÃO COM O SEU BANCO DE DADOS SUPABASE
         // ══════════════════════════════════════════════
         const supabaseUrl = 'https://nojkeyqycpvnolnuzwnj.supabase.co';
         const supabaseKey = 'sb_publishable_v16thezDVJS97xDtzo8SmA_X9tz3G4M';
@@ -197,19 +200,44 @@
 
         function convertToCompanyDayIdx(momentDay) { return momentDay === 0 ? 6 : momentDay - 1; }
 
+        function showScreenError(title, description) {
+            document.getElementById('loader-spinner').style.display = 'none';
+            document.getElementById('loading-screen').innerHTML = `
+                <div class="max-w-xs bg-red-50 text-red-800 p-6 rounded-2xl border border-red-100 shadow-sm">
+                    <i class="ph ph-warning-circle text-3xl mb-2 text-red-500 block"></i>
+                    <h3 class="font-bold text-sm uppercase tracking-wide mb-1">${title}</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed font-medium">${description}</p>
+                </div>
+            `;
+        }
+
         async function loadAllData() {
             const urlParams = new URLSearchParams(window.location.search);
             const slug = urlParams.get('s');
-            if (!slug) return;
+            
+            // Segurança 1: Evita travar se faltar o parâmetro ?s= na URL
+            if (!slug) {
+                showScreenError(
+                    "Link Incompleto", 
+                    "Nenhuma empresa foi definida na URL. Use o formato correto: <br><code class='bg-white px-1.5 py-0.5 rounded text-red-600 font-mono text-[10px] block mt-2 border border-red-100'>seusite.com/agendamento.html?s=NOME-DA-EMPRESA</code>"
+                );
+                return;
+            }
 
             try {
+                // Busca perfil da empresa
                 const { data: prof, error: e1 } = await supabaseClient.from('perfis_empresas').select('*').eq('slug', slug).single();
-                if (e1 || !prof) throw new Error();
-                companyData = prof; companyId = prof.id;
+                if (e1 || !prof) {
+                    showScreenError("Não Encontrado", "Esta empresa não está cadastrada ou o link está digitado incorretamente.");
+                    return;
+                }
+                
+                companyData = prof; 
+                companyId = prof.id;
 
                 if(prof.cor_primaria) document.documentElement.style.setProperty('--primary-color', prof.cor_primaria);
-                document.getElementById('db-name').innerText = prof.nome_empresa;
-                if (prof.nome_empresa.length < 25) document.getElementById('verified-icon').classList.remove('hidden');
+                document.getElementById('db-name').innerText = prof.nome_empresa || "Empresa";
+                if (prof.nome_empresa && prof.nome_empresa.length < 25) document.getElementById('verified-icon').classList.remove('hidden');
                 document.getElementById('db-bio').innerText = prof.bio || "";
                 if(prof.logo_url) document.getElementById('db-profile').src = prof.logo_url;
                 
@@ -218,28 +246,36 @@
                     document.getElementById('notices-section').classList.remove('hidden');
                 }
 
-                document.getElementById('db-whatsapp-link').href = `https://wa.me/${prof.whatsapp.replace(/\D/g,'')}`;
-                document.getElementById('db-instagram-link').href = `https://instagram.com/${prof.instagram?.replace('@','')}`;
+                if(prof.whatsapp) document.getElementById('db-whatsapp-link').href = `https://wa.me/${prof.whatsapp.replace(/\D/g,'')}`;
+                if(prof.instagram) document.getElementById('db-instagram-link').href = `https://instagram.com/${prof.instagram?.replace('@','')}`;
 
+                // Busca Colaboradores
                 const { data: pros = [] } = await supabaseClient.from('colaboradores').select('*').eq('empresa_id', companyId);
                 hasColaboradores = (pros && pros.length > 0);
-                selectedProName = hasColaboradores ? "" : prof.nome_empresa;
+                selectedProName = hasColaboradores ? "" : (prof.nome_empresa || "Geral");
                 if (hasColaboradores) renderProfessionals(pros, prof);
 
+                // Busca Serviços
                 const { data: servs = [] } = await supabaseClient.from('servicos').select('*').eq('empresa_id', companyId);
                 renderServices(servs || []);
                 
+                // Busca Configuração de Horários da Empresa
                 const { data: hrs = [] } = await supabaseClient.from('horarios').select('*').eq('empresa_id', companyId);
                 businessHours = hrs || [];
 
-                const { data: agends = [] } = await supabaseClient.from('agendamentos').select('data_hora, profissional_nome, servicos(duracao)').eq('empresa_id', companyId);
+                // Segurança 2: Simplificado o select de agendamentos para evitar quebras por diferenças estruturais nas FKs
+                const { data: agends = [] } = await supabaseClient.from('agendamentos').select('data_hora, profissional_nome').eq('empresa_id', companyId);
                 existingAppointments = agends || [];
 
                 updateStepNumbers();
+                
+                // Esconde a tela de carregamento e exibe o app
                 document.getElementById('loading-screen').classList.add('hidden');
                 generateCalendar(8, true);
+
             } catch (e) { 
-                document.getElementById('loading-screen').innerHTML = "<div class='text-center p-10 font-bold'>Erro ao carregar dados.</div>"; 
+                console.error(e);
+                showScreenError("Erro de Conexão", "Falha ao ler dados do banco. Verifique suas tabelas no Supabase.");
             }
         }
 
@@ -266,17 +302,7 @@
                 
                 const isOccupied = existingAppointments.some(a => {
                     const agInicio = moment(a.data_hora); 
-                    
-                    let dur = 30;
-                    if (a.servicos) {
-                        if (Array.isArray(a.servicos)) {
-                            dur = parseInt(a.servicos[0]?.duracao) || 30;
-                        } else {
-                            dur = parseInt(a.servicos.duracao) || 30;
-                        }
-                    }
-                    
-                    const agFim = agInicio.clone().add(dur, 'minutes');
+                    const agFim = agInicio.clone().add(30, 'minutes'); // Fallback padrão de 30 minutos em caso de conflitos
                     const conflito = (slotStart.isBefore(agFim) && slotEnd.isAfter(agInicio));
                     
                     return hasColaboradores ? (conflito && a.profissional_nome === selectedProName) : conflito;
@@ -343,10 +369,7 @@
                     servico_id: service.getAttribute('data-id')
                 });
 
-                if (error) {
-                    console.error("Erro retornado do Banco de Dados:", error);
-                    throw new Error(error.message);
-                }
+                if (error) throw new Error(error.message);
 
                 document.getElementById('app-content').classList.add('hidden');
                 document.getElementById('step-success').classList.remove('hidden');
@@ -409,7 +432,7 @@
 
         function renderServices(list = []) {
             const container = document.getElementById('services-list');
-            if(!list || !list.length) { container.innerHTML = "<p class='text-center text-slate-400 text-xs'>Nenhum serviço.</p>"; return; }
+            if(!list || !list.length) { container.innerHTML = "<p class='text-center text-slate-400 text-xs py-4'>Nenhum serviço cadastrado.</p>"; return; }
             
             container.innerHTML = list.map(s => {
                 const duracaoLimpa = parseInt(s.duracao) || 30;
@@ -432,7 +455,8 @@
 
         function renderProfessionals(pros = [], owner = {}) {
             const container = document.getElementById('pros-list');
-            let html = `<button onclick="selectPro(this, '${owner.nome_empresa}')" class="pro-btn p-5 bg-white border border-slate-100 rounded-3xl text-center flex flex-col items-center"><div class="w-14 h-14 rounded-full overflow-hidden mb-2 shadow-sm border-2 border-white"><img src="${owner.logo_url || ''}" onerror="this.src='https://placehold.co/200x200?text=Logo'" class="w-full h-full object-cover"></div><p class="font-bold text-[10px] text-slate-800 uppercase tracking-tighter truncate w-full">${owner.nome_empresa.split(' ')[0]}</p></button>`;
+            const ownerName = owner.nome_empresa || "Geral";
+            let html = `<button onclick="selectPro(this, '${ownerName}')" class="pro-btn p-5 bg-white border border-slate-100 rounded-3xl text-center flex flex-col items-center"><div class="w-14 h-14 rounded-full overflow-hidden mb-2 shadow-sm border-2 border-white"><img src="${owner.logo_url || ''}" onerror="this.src='https://placehold.co/200x200?text=Logo'" class="w-full h-full object-cover"></div><p class="font-bold text-[10px] text-slate-800 uppercase tracking-tighter truncate w-full">${ownerName.split(' ')[0]}</p></button>`;
             if (pros && pros.length) {
                 html += pros.map(p => `<button onclick="selectPro(this, '${p.nome}')" class="pro-btn p-5 bg-white border border-slate-100 rounded-3xl text-center flex flex-col items-center"><div class="w-14 h-14 rounded-full overflow-hidden mb-2 shadow-sm border-2 border-white"><img src="${p.foto_url || ''}" onerror="this.src='https://placehold.co/200x200?text=Foto'" class="w-full h-full object-cover"></div><p class="font-bold text-[10px] text-slate-800 uppercase tracking-tighter truncate w-full">${p.nome.split(' ')[0]}</p></button>`).join('');
             }
@@ -498,6 +522,8 @@
         }
 
         function toggleContactModal() { document.getElementById('contact-modal').classList.toggle('hidden'); }
+        
+        // Inicializa o carregamento dos dados
         window.onload = loadAllData;
     </script>
 </body>
