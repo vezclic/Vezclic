@@ -1,0 +1,22 @@
+[
+  {
+    "versao": "0.0.0.2",
+    "data": "18/05/2026",
+    "novidades": [
+      "Interface unificada de exibição de versão para Mobile e Desktop.",
+      "Adicionado painel interativo (Changelog) para listagem de atualizações do sistema.",
+      "Otimização no layout dos scrollbars internos do aplicativo.",
+      "Ajustes finos no fluxo de validação das restrições de horários."
+    ]
+  },
+  {
+    "versao": "0.0.0.1",
+    "data": "10/05/2026",
+    "novidades": [
+      "Lançamento da primeira versão estrutural Alpha do painel de reservas.",
+      "Configuração do formulário de dados da empresa com tratamento de máscaras de entrada.",
+      "Integração com Supabase Client para futuras gravações assíncronas.",
+      "Criação do gatilho para autenticação e redirecionamento via Google OAuth."
+    ]
+  }
+]
