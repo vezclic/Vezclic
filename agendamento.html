@@ -9,7 +9,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
         :root { --primary-color: #0f172a; }
@@ -270,7 +269,6 @@
                 const { data: hrs = [] } = await supabaseClient.from('horarios').select('*').eq('eid', companyId);
                 businessHours = hrs || [];
 
-                // Puxa de agendamentos selecionando '*' para evitar erros de cache estrutural
                 const { data: agends = [] } = await supabaseClient.from('agendamentos').select('*').eq('eid', companyId);
                 existingAppointments = agends || [];
 
@@ -284,7 +282,7 @@
             }
         }
 
-        // CORREÇÃO DO SUMIÇO DA TARDE: Alterado de .find() para .filter() para suportar turnos partidos
+        // BLOQUEIO SEGURO E SUPORTE A MÚLTIPLOS TURNOS (ALMOÇO)
         function getAvailableSlots(dateISO, momentDayIdx) {
             const configs = businessHours.filter(h => parseInt(h.dia) === convertToCompanyDayIdx(momentDayIdx));
             if(configs.length === 0) return [];
@@ -305,12 +303,15 @@
                         continue;
                     }
 
-                    // Validação robusta contra conflito de horários comprometidos
+                    // CORREÇÃO DO BLOQUEIO EM MASSA: Ignora o fuso horário textual (+00) para evitar desalinhar a verificação
                     const isOccupied = existingAppointments.some(a => {
                         const dataComprometida = a.horario || a.data_hora || a.data;
                         if (!dataComprometida) return false;
 
-                        const agInicio = moment(dataComprometida); 
+                        // Extrai a data textual limpa removendo o "Z" ou offsets para bater 100% com o slot do front-end
+                        const dataLimpa = dataComprometida.replace('Z', '').substring(0, 19);
+                        const agInicio = moment(dataLimpa); 
+                        
                         const idServico = a.servicos_id || a.servico_id;
                         const servicoDoAgendamento = allServices.find(s => s.id == idServico);
                         const duracaoAgendamento = servicoDoAgendamento ? (parseInt(servicoDoAgendamento.tempo) || 30) : 30;
@@ -324,7 +325,6 @@
                 }
             });
 
-            // Ordena os horários cronologicamente após juntar os turnos
             return slots.sort((a, b) => a.localeCompare(b));
         }
 
@@ -358,6 +358,7 @@
 
         function loadMoreDays() { generateCalendar(8, false); }
 
+        // SALVAMENTO SEGURO — TRATAMENTO DE ERROS DE COLUNA SINGULAR/PLURAL
         async function saveAndFinish() {
             const name = document.getElementById('client-name').value.trim().toUpperCase();
             const phone = document.getElementById('client-phone').value;
@@ -372,18 +373,28 @@
             
             const dataParaSalvar = moment(`${selectedDate} ${selectedTimeValue}`, "YYYY-MM-DD HH:mm").format("YYYY-MM-DD HH:mm:ss");
             
-            try {
-                // CORREÇÃO DO ERRO DE SCHEMA: Mapeado exatamente para usar 'servicos_id' e 'horario'
-                const { error } = await supabaseClient.from('agendamentos').insert({
-                    eid: companyId,
-                    cliente: name,
-                    whatsapp: phone.replace(/\D/g,''),
-                    horario: dataParaSalvar,
-                    servicos_id: parseInt(service.getAttribute('data-id')),
-                    status: 'pendente'
-                });
+            let payload = {
+                eid: companyId,
+                cliente: name,
+                whatsapp: phone.replace(/\D/g,''),
+                horario: dataParaSalvar,
+                status: 'pendente'
+            };
 
-                if (error) throw new Error(error.message);
+            try {
+                // Tenta injetar via servicos_id (Plural)
+                payload.servicos_id = parseInt(service.getAttribute('data-id'));
+                let response = await supabaseClient.from('agendamentos').insert(payload);
+                
+                // FALLBACK AUTOMÁTICO: Caso acuse erro na coluna por cache, inverte para servico_id (Singular)
+                if (response.error && (response.error.message.includes('column') || response.error.message.includes('cache'))) {
+                    delete payload.servicos_id;
+                    payload.servico_id = parseInt(service.getAttribute('data-id'));
+                    const retry = await supabaseClient.from('agendamentos').insert(payload);
+                    if (retry.error) throw new Error(retry.error.message);
+                } else if (response.error) {
+                    throw new Error(response.error.message);
+                }
 
                 document.getElementById('app-content').classList.add('hidden');
                 document.getElementById('step-success').classList.remove('hidden');
