@@ -220,7 +220,6 @@
 
             try {
                 let query = supabaseClient.from('empresas').select('*');
-                
                 if (!isNaN(slug)) {
                     query = query.eq('id', parseInt(slug));
                 } else {
@@ -229,7 +228,6 @@
                 }
 
                 const { data: profs, error: e1 } = await query;
-                
                 if (e1 || !profs || profs.length === 0) {
                     showScreenError("Não Encontrado", "Esta empresa não está cadastrada ou o link está digitado incorretamente.");
                     return;
@@ -245,7 +243,6 @@
                 if (nomeEmpresa.length < 25) document.getElementById('verified-icon').classList.remove('hidden');
                 document.getElementById('db-bio').innerText = prof.bio || "";
                 if(prof.logo_url) document.getElementById('db-profile').src = prof.logo_url;
-                
                 if (prof.cor_primaria) document.documentElement.style.setProperty('--primary-color', prof.cor_primaria);
 
                 if (prof.avisos && prof.avisos.trim().length > 0) {
@@ -273,8 +270,8 @@
                 const { data: hrs = [] } = await supabaseClient.from('horarios').select('*').eq('eid', companyId);
                 businessHours = hrs || [];
 
-                // Lendo a coluna correta de agendamentos: 'horario'
-                const { data: agends = [] } = await supabaseClient.from('agendamentos').select('horario, servico_id').eq('eid', companyId);
+                // Puxa de agendamentos selecionando '*' para evitar erros de cache estrutural
+                const { data: agends = [] } = await supabaseClient.from('agendamentos').select('*').eq('eid', companyId);
                 existingAppointments = agends || [];
 
                 updateStepNumbers();
@@ -287,42 +284,48 @@
             }
         }
 
+        // CORREÇÃO DO SUMIÇO DA TARDE: Alterado de .find() para .filter() para suportar turnos partidos
         function getAvailableSlots(dateISO, momentDayIdx) {
-            const config = businessHours.find(h => parseInt(h.dia) === convertToCompanyDayIdx(momentDayIdx));
-            if(!config) return [];
+            const configs = businessHours.filter(h => parseInt(h.dia) === convertToCompanyDayIdx(momentDayIdx));
+            if(configs.length === 0) return [];
 
             let slots = [];
-            let current = moment(config.inicio, "HH:mm:ss");
-            const endHour = moment(config.fim, "HH:mm:ss");
-            const pStart = config.pausa_inicio && config.pausa_inicio !== "NULL" && config.pausa_inicio !== null ? moment(config.pausa_inicio, "HH:mm:ss") : null;
-            const pEnd = config.pausa_fim && config.pausa_fim !== "NULL" && config.pausa_fim !== null ? moment(config.pausa_fim, "HH:mm:ss") : null;
 
-            while(current.isBefore(endHour)) {
-                const timeStr = current.format("HH:mm");
-                const slotStart = moment(`${dateISO} ${timeStr}`, "YYYY-MM-DD HH:mm");
-                const slotEnd = slotStart.clone().add(currentServiceDuration, 'minutes');
-                
-                if (slotEnd.isAfter(moment(`${dateISO} ${config.fim}`, "YYYY-MM-DD HH:mm:ss"))) {
-                    current.add(30, 'minutes'); continue;
-                }
+            configs.forEach(config => {
+                let current = moment(config.inicio, "HH:mm:ss");
+                const endHour = moment(config.fim, "HH:mm:ss");
 
-                const isPaused = pStart && pEnd && (slotStart.isBefore(pEnd.clone().set({year: slotStart.year(), month: slotStart.month(), date: slotStart.date()})) && slotEnd.isAfter(pStart.clone().set({year: slotStart.year(), month: slotStart.month(), date: slotStart.date()})));
-                
-                const isOccupied = existingAppointments.some(a => {
-                    if (!a.horario) return false; // Bloqueia falsos conflitos nulos/indefinidos
-
-                    const agInicio = moment(a.horario); 
-                    const servicoDoAgendamento = allServices.find(s => s.id == a.servico_id);
-                    const duracaoAgendamento = servicoDoAgendamento ? (parseInt(servicoDoAgendamento.tempo) || 30) : 30;
+                while(current.isBefore(endHour)) {
+                    const timeStr = current.format("HH:mm");
+                    const slotStart = moment(`${dateISO} ${timeStr}`, "YYYY-MM-DD HH:mm");
+                    const slotEnd = slotStart.clone().add(currentServiceDuration, 'minutes');
                     
-                    const agFim = agInicio.clone().add(duracaoAgendamento, 'minutes');
-                    return (slotStart.isBefore(agFim) && slotEnd.isAfter(agInicio));
-                });
+                    if (slotEnd.isAfter(moment(`${dateISO} ${config.fim}`, "YYYY-MM-DD HH:mm:ss"))) {
+                        current.add(30, 'minutes'); 
+                        continue;
+                    }
 
-                if(!isPaused && !isOccupied) slots.push(timeStr);
-                current.add(30, 'minutes');
-            }
-            return slots;
+                    // Validação robusta contra conflito de horários comprometidos
+                    const isOccupied = existingAppointments.some(a => {
+                        const dataComprometida = a.horario || a.data_hora || a.data;
+                        if (!dataComprometida) return false;
+
+                        const agInicio = moment(dataComprometida); 
+                        const idServico = a.servicos_id || a.servico_id;
+                        const servicoDoAgendamento = allServices.find(s => s.id == idServico);
+                        const duracaoAgendamento = servicoDoAgendamento ? (parseInt(servicoDoAgendamento.tempo) || 30) : 30;
+                        
+                        const agFim = agInicio.clone().add(duracaoAgendamento, 'minutes');
+                        return (slotStart.isBefore(agFim) && slotEnd.isAfter(agInicio));
+                    });
+
+                    if(!isOccupied) slots.push(timeStr);
+                    current.add(30, 'minutes');
+                }
+            });
+
+            // Ordena os horários cronologicamente após juntar os turnos
+            return slots.sort((a, b) => a.localeCompare(b));
         }
 
         function generateCalendar(count, clear = false) {
@@ -336,11 +339,11 @@
                 const targetDate = baseDate.clone().add(displayedDaysCount, 'days');
                 const momentDayIdx = targetDate.day();
                 const dateISO = targetDate.format("YYYY-MM-DD");
-                const configDia = businessHours.find(h => parseInt(h.dia) === convertToCompanyDayIdx(momentDayIdx));
+                const temHorario = businessHours.some(h => parseInt(h.dia) === convertToCompanyDayIdx(momentDayIdx));
                 const slotsDisponiveis = getAvailableSlots(dateISO, momentDayIdx);
 
                 const btn = document.createElement('button');
-                if (configDia && slotsDisponiveis.length > 0) {
+                if (temHorario && slotsDisponiveis.length > 0) {
                     btn.className = "date-btn py-2.5 px-4 bg-white border border-slate-100 rounded-2xl transition-all flex flex-col items-center justify-center active:scale-95";
                     btn.onclick = () => selectDate(btn, dateISO, momentDayIdx);
                 } else {
@@ -370,13 +373,13 @@
             const dataParaSalvar = moment(`${selectedDate} ${selectedTimeValue}`, "YYYY-MM-DD HH:mm").format("YYYY-MM-DD HH:mm:ss");
             
             try {
-                // Inserção apontando para as colunas certas do seu novo SQL estruturado
+                // CORREÇÃO DO ERRO DE SCHEMA: Mapeado exatamente para usar 'servicos_id' e 'horario'
                 const { error } = await supabaseClient.from('agendamentos').insert({
                     eid: companyId,
                     cliente: name,
                     whatsapp: phone.replace(/\D/g,''),
                     horario: dataParaSalvar,
-                    servico_id: service.getAttribute('data-id'),
+                    servicos_id: parseInt(service.getAttribute('data-id')),
                     status: 'pendente'
                 });
 
@@ -484,7 +487,6 @@
             if(counters.length) { counters.forEach(c => c.innerText = `PASSO ${currentStep} DE ${total}`); }
         }
 
-        // Removidos os IDs antigos que ocultavam o cabeçalho no fluxo para manter o topo fixo e estável
         function processFlow() {
             const btnText = document.getElementById('main-action-btn');
             if (currentStep === 1) {
