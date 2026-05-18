@@ -210,7 +210,6 @@
 
         async function loadAllData() {
             const urlParams = new URLSearchParams(window.location.search);
-            // Aceita o parâmetro tanto como 's' quanto como 'u' para evitar falhas de digitação
             const slug = urlParams.get('s') || urlParams.get('u');
             
             if (!slug) {
@@ -222,14 +221,11 @@
             }
 
             try {
-                // 1. Monta a busca apontando para a sua tabela correta: 'empresas'
                 let query = supabaseClient.from('empresas').select('*');
                 
                 if (!isNaN(slug)) {
-                    // Se passar um número (ex: ?s=5), busca direto pelo ID numérico
                     query = query.eq('id', parseInt(slug));
                 } else {
-                    // Se for texto (ex: ?s=empresa-teste), remove hífens e compara de forma case-insensitive
                     const nomeComEspaco = slug.replace(/-/g, ' ');
                     query = query.or(`empresa.ilike.%${slug}%,empresa.ilike.%${nomeComEspaco}%`);
                 }
@@ -245,7 +241,6 @@
                 companyData = prof; 
                 companyId = prof.id;
 
-                // Mapeia os dados usando os nomes reais das suas colunas
                 const nomeEmpresa = prof.empresa || "Empresa";
                 document.getElementById('db-name').innerText = nomeEmpresa;
                 
@@ -263,7 +258,6 @@
                 if(prof.whatsapp) document.getElementById('db-whatsapp-link').href = `https://wa.me/${prof.whatsapp.replace(/\D/g,'')}`;
                 if(prof.instagram) document.getElementById('db-instagram-link').href = `https://instagram.com/${prof.instagram?.replace('@','')}`;
 
-                // Busca Colaboradores de forma segura (previne quebras caso a tabela esteja vazia)
                 try {
                     const { data: pros = [] } = await supabaseClient.from('colaboradores').select('*').eq('empresa_id', companyId);
                     hasColaboradores = (pros && pros.length > 0);
@@ -274,21 +268,17 @@
                 
                 selectedProName = hasColaboradores ? "" : nomeEmpresa;
 
-                // Busca Serviços
                 const { data: servs = [] } = await supabaseClient.from('servicos').select('*').eq('empresa_id', companyId);
                 renderServices(servs || []);
                 
-                // Busca Configuração de Horários da Empresa
                 const { data: hrs = [] } = await supabaseClient.from('horarios').select('*').eq('empresa_id', companyId);
                 businessHours = hrs || [];
 
-                // Busca Agendamentos existentes
                 const { data: agends = [] } = await supabaseClient.from('agendamentos').select('data_hora, profissional_nome').eq('empresa_id', companyId);
                 existingAppointments = agends || [];
 
                 updateStepNumbers();
                 
-                // Esconde a tela de carregamento e exibe o app funcional
                 document.getElementById('loading-screen').classList.add('hidden');
                 generateCalendar(8, true);
 
@@ -474,8 +464,8 @@
 
         function renderProfessionals(pros = [], owner = {}) {
             const container = document.getElementById('pros-list');
-            const oName = owner.empresa || "Geral";
-            let html = `<button onclick="selectPro(this, '${oName}')" class="pro-btn p-5 bg-white border border-slate-100 rounded-3xl text-center flex flex-col items-center"><div class="w-14 h-14 rounded-full overflow-hidden mb-2 shadow-sm border-2 border-white"><img src="${owner.logo_url || ''}" onerror="this.src='https://placehold.co/200x200?text=Logo'" class="w-full h-full object-cover"></div><p class="font-bold text-[10px] text-slate-800 uppercase tracking-tighter truncate w-full">${oName.split(' ')[0]}</p></button>`;
+            const ownerName = owner.nome_empresa || "Geral";
+            let html = `<button onclick="selectPro(this, '${ownerName}')" class="pro-btn p-5 bg-white border border-slate-100 rounded-3xl text-center flex flex-col items-center"><div class="w-14 h-14 rounded-full overflow-hidden mb-2 shadow-sm border-2 border-white"><img src="${owner.logo_url || ''}" onerror="this.src='https://placehold.co/200x200?text=Logo'" class="w-full h-full object-cover"></div><p class="font-bold text-[10px] text-slate-800 uppercase tracking-tighter truncate w-full">${ownerName.split(' ')[0]}</p></button>`;
             if (pros && pros.length) {
                 html += pros.map(p => `<button onclick="selectPro(this, '${p.nome}')" class="pro-btn p-5 bg-white border border-slate-100 rounded-3xl text-center flex flex-col items-center"><div class="w-14 h-14 rounded-full overflow-hidden mb-2 shadow-sm border-2 border-white"><img src="${p.foto_url || ''}" onerror="this.src='https://placehold.co/200x200?text=Foto'" class="w-full h-full object-cover"></div><p class="font-bold text-[10px] text-slate-800 uppercase tracking-tighter truncate w-full">${p.nome.split(' ')[0]}</p></button>`).join('');
             }
@@ -537,7 +527,7 @@
         function openMaps() { 
             if(!companyData || !companyData.endereco_rua) return alert("Endereço não cadastrado."); 
             const address = `${companyData.endereco_rua}, ${companyData.endereco_numero}, ${companyData.endereco_cidade} - ${companyData.endereco_estado}`;
-            window.open suicide(`https://maps.google.com/?q=${encodeURIComponent(address)}`, '_blank'); 
+            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank'); 
         }
 
         function toggleContactModal() { document.getElementById('contact-modal').classList.toggle('hidden'); }
