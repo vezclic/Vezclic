@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo | Vezclic</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 99px; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <div id="global-loader" class="fixed inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center gap-3">
+        <div class="w-10 h-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Sincronizando Vezclic...</p>
+    </div>
+
+    <aside class="w-64 bg-slate-900 border-r border-white/5 flex flex-col justify-between shrink-0 h-full">
+        <div class="p-6 space-y-8">
+            <div class="flex items-center gap-2 select-none">
+                <span class="text-2xl font-black tracking-tighter">
+                    <span class="text-blue-500">Vez</span>clic<span class="text-orange-500">!</span>
+                </span>
+                <span class="text-[9px] font-extrabold bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-md tracking-wider uppercase border border-blue-500/10">PRO</span>
+            </div>
+
+            <div class="bg-slate-950/60 p-3.5 rounded-xl border border-white/5 space-y-2">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Seu link de agendamento:</span>
+                <div class="flex items-center gap-2 bg-slate-900 p-2 rounded-lg border border-white/5 justify-between">
+                    <span id="link-display" class="text-xs text-slate-300 font-mono truncate">Carregando...</span>
+                    <button onclick="copyClientLink()" class="text-blue-400 hover:text-blue-300 p-1 rounded transition-colors active:scale-90">
+                        <i class="ph ph-copy text-base"></i>
+                    </button>
+                </div>
+            </div>
+
+            <nav class="space-y-1.5">
+                <button onclick="switchTab('agendamentos')" id="btn-agendamentos" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all text-slate-400 hover:text-white hover:bg-white/5">
+                    <i class="ph ph-calendar-check text-lg"></i> Agendamentos
+                </button>
+                <button onclick="switchTab('servicos')" id="btn-servicos" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all text-slate-400 hover:text-white hover:bg-white/5">
+                    <i class="ph ph-scissors text-lg"></i> Serviços
+                </button>
+                <button onclick="switchTab('horarios')" id="btn-horarios" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all text-slate-400 hover:text-white hover:bg-white/5">
+                    <i class="ph ph-clock text-lg"></i> Horários
+                </button>
+                <button onclick="switchTab('configuracoes')" id="btn-configuracoes" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all text-slate-400 hover:text-white hover:bg-white/5">
+                    <i class="ph ph-gear text-lg"></i> Configurações
+                </button>
+            </nav>
+        </div>
+
+        <div class="p-6 border-t border-white/5">
+            <button onclick="handleLogout()" class="w-full flex items-center justify-center gap-2 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-xs uppercase tracking-widest rounded-xl transition-all border border-red-500/10 active:scale-[0.98]">
+                <i class="ph ph-sign-out text-base"></i> Sair do Painel
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 bg-slate-950 overflow-y-auto p-6 md:p-10 relative">
+        
+        <section id="tab-agendamentos" class="tab-content space-y-6 fade-in">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-6">
+                <div>
+                    <h2 class="text-2xl font-black tracking-tight">Agendamentos</h2>
+                    <p class="text-xs font-medium text-slate-400 mt-1">Gerencie a sua agenda de reservas filtrada por dia.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <input type="date" id="agenda-date-filter" onchange="loadAgendamentos()" class="bg-slate-900 border border-white/10 text-slate-200 px-4 py-2.5 rounded-xl text-sm font-semibold outline-none focus:border-blue-500 transition-colors">
+                    <button onclick="openAppointmentModal()" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider px-5 py-3 rounded-xl shadow-lg shadow-blue-500/10 transition-all active:scale-95">
+                        <i class="ph ph-plus-bold text-sm"></i> Novo Agendamento
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-white/5 rounded-2xl overflow-hidden shadow-xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-950/60 text-slate-400 font-bold uppercase text-[10px] tracking-widest border-b border-white/5">
+                                <th class="p-4 pl-6">Cliente</th>
+                                <th class="p-4">Horário</th>
+                                <th class="p-4">Serviço</th>
+                                <th class="p-4">Valor</th>
+                                <th class="p-4 text-center">Contato</th>
+                                <th class="p-4 text-center pr-6">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="agendamentos-table-body" class="divide-y divide-white/5 font-medium text-slate-200">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-servicos" class="tab-content space-y-6">
+            <div class="flex items-center justify-between border-b border-white/5 pb-6">
+                <div>
+                    <h2 class="text-2xl font-black tracking-tight">Serviços</h2>
+                    <p class="text-xs font-medium text-slate-400 mt-1">Configure os serviços e valores oferecidos no catálogo.</p>
+                </div>
+                <button onclick="openServiceModal(null)" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider px-5 py-3 rounded-xl transition-all active:scale-95">
+                    <i class="ph ph-plus-bold text-sm"></i> Adicionar Serviço
+                </button>
+            </div>
+
+            <div id="services-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                </div>
+        </section>
+
+        <section id="tab-horarios" class="tab-content space-y-6">
+            <div class="flex items-center justify-between border-b border-white/5 pb-6">
+                <div>
+                    <h2 class="text-2xl font-black tracking-tight">Horários de Trabalho</h2>
+                    <p class="text-xs font-medium text-slate-400 mt-1">Configure o seu expediente diário e intervalos de almoço.</p>
+                </div>
+                <button onclick="saveAllHorarios()" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider px-6 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/10 active:scale-95">
+                    <i class="ph ph-floppy-disk text-base"></i> Salvar Geral
+                </button>
+            </div>
+
+            <div id="horarios-container" class="space-y-4">
+                </div>
+        </section>
+
+        <section id="tab-configuracoes" class="tab-content space-y-6">
+            <div class="border-b border-white/5 pb-6">
+                <h2 class="text-2xl font-black tracking-tight">Configurações do Perfil</h2>
+                <p class="text-xs font-medium text-slate-400 mt-1">Edite a identidade pública da sua empresa no catálogo.</p>
+            </div>
+
+            <div class="max-w-xl bg-slate-900 border border-white/5 rounded-2xl p-6 shadow-xl space-y-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-wide">Nome da Empresa</label>
+                        <input type="text" id="config-empresa-name" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3.5 text-sm text-slate-200 outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-wide">Nome de Usuário (Username / Slug URL)</label>
+                        <input type="text" id="config-empresa-slug" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3.5 text-sm text-slate-200 outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-wide">Link da Foto de Perfil (Logo URL)</label>
+                    <input type="url" id="config-empresa-logo" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3.5 text-sm text-slate-200 font-mono outline-none focus:border-blue-500 transition-colors">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-wide">Biografia / Descrição da Empresa</label>
+                    <textarea id="config-empresa-bio" rows="4" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3.5 text-sm text-slate-200 outline-none focus:border-blue-500 transition-colors resize-none"></textarea>
+                </div>
+                <div class="flex justify-end pt-2">
+                    <button onclick="saveConfigPerfil()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-widest px-6 py-3.5 rounded-xl shadow-lg shadow-blue-500/10 transition-all active:scale-95">
+                        Salvar Perfil
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="modal-agendamento" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-white/10 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-white/5 pb-3">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2"><i class="ph ph-calendar-plus text-blue-400"></i> Novo Agendamento Manual</h3>
+                <button onclick="closeAppointmentModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5"><i class="ph ph-x text-xl"></i></button>
+            </div>
+            <div class="space-y-3 text-sm">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Nome Completo do Cliente</label>
+                    <input type="text" id="modal-agend-name" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-slate-200 outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Telefone WhatsApp</label>
+                    <input type="tel" id="modal-agend-phone" oninput="maskPhone(this)" placeholder="(00) 00000-0000" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-slate-200 outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Escolha o Serviço</label>
+                    <select id="modal-agend-service" onchange="calculateManualAvailableSlots()" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-slate-200 outline-none focus:border-blue-500">
+                        </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Data da Reserva</label>
+                    <input type="date" id="modal-agend-date" onchange="calculateManualAvailableSlots()" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-slate-200 outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Horários Disponíveis no Mapa</label>
+                    <select id="modal-agend-time" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-slate-200 outline-none focus:border-blue-500">
+                        <option value="">Selecione a data primeiro...</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="submitManualAppointment()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl uppercase text-xs tracking-wider transition-all active:scale-95 shadow-lg shadow-blue-500/10">
+                Confirmar e Inserir na Agenda
+            </button>
+        </div>
+    </div>
+
+    <div id="modal-servico" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-white/10 w-full max-w-sm rounded-2xl p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-white/5 pb-3">
+                <h3 id="modal-servico-title" class="text-lg font-bold text-white flex items-center gap-2">Configurar Serviço</h3>
+                <button onclick="closeServiceModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5"><i class="ph ph-x text-xl"></i></button>
+            </div>
+            <input type="hidden" id="modal-servico-id">
+            <div class="space-y-3 text-sm">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Nome do Serviço</label>
+                    <input type="text" id="modal-servico-name" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-slate-200 outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Valor do Serviço</label>
+                    <input type="text" id="modal-servico-price" oninput="maskCurrency(this)" placeholder="R$ 0,00" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-slate-200 outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Tempo de Duração</label>
+                    <select id="modal-servico-duration" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-slate-200 outline-none focus:border-blue-500"></select>
+                </div>
+            </div>
+            <button onclick="submitServiceForm()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl uppercase text-xs tracking-wider transition-all active:scale-95">
+                Salvar Configurações
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ══════════════════════════════════════════════
+        // CONFIGURAÇÕES SUPABASE
+        // ══════════════════════════════════════════════
+        const companyId = 8; // ID padrão da empresa do seu projeto mapeado nos passos anteriores
+        let currentTab = 'agendamentos';
+        let isHorariosDirty = false; // Rastreia modificações pendentes na aba de horários
+
+        const daysOfWeek = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+
+        // ══════════════════════════════════════════════
+        // INICIALIZADOR DE INTERFACE
+        // ══════════════════════════════════════════════
+        async function initDashboard() {
+            document.getElementById('agenda-date-filter').value = moment().format('YYYY-MM-DD');
+            populateDurationDropdowns();
+            
+            // Força a carga sequencial das tabelas do banco
+            await loadPerfil();
+            await loadAgendamentos();
+            await loadServicos();
+            await loadHorariosView();
+            
+            switchTab('agendamentos');
+            document.getElementById('global-loader').classList.add('hidden');
+        }
+
+        function switchTab(targetTab) {
+            // Validador de dados não salvos na aba de horários
+            if (currentTab === 'horarios' && targetTab !== 'horarios' && isHorariosDirty) {
+                if (!confirm("Você possui horários modificados que não foram salvos! Deseja descartar as alterações?")) {
+                    return;
+                }
+                isHorariosDirty = false;
+                loadHorariosView(); // Descarta e recarrega os dados originais
+            }
+
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('bg-blue-600', 'text-white', 'bg-white/5'));
+
+            document.getElementById(`tab-${targetTab}`).classList.add('active');
+            const targetBtn = document.getElementById(`btn-${targetTab}`);
+            targetBtn.classList.add('bg-blue-600', 'text-white');
+            currentTab = targetTab;
+        }
+
+        // ══════════════════════════════════════════════
+        // LOGICA: ABA PERFIL & CONFIGURAÇÕES
+        // ══════════════════════════════════════════════
+        async function loadPerfil() {
+            const { data, error } = await supabaseClient.from('empresas').select('*').eq('id', companyId).single();
+            if (!error && data) {
+                companyData = data;
+                document.getElementById('config-empresa-name').value = data.empresa || "";
+                document.getElementById('config-empresa-slug').value = data.slug || "";
+                document.getElementById('config-empresa-logo').value = data.logo_url || "";
+                document.getElementById('config-empresa-bio').value = data.bio || "";
+                
+                // Monta dinamicamente a string do link do cliente copiável
+                const cleanSlug = (data.slug || "").toLowerCase().replace(/\s+/g, '-');
+                document.getElementById('link-display').innerText = `${window.location.host}/?s=${cleanSlug}`;
+            }
+        }
+
+        async function saveConfigPerfil() {
+            const name = document.getElementById('config-empresa-name').value.trim();
+            const slug = document.getElementById('config-empresa-slug').value.trim().toLowerCase().replace(/\s+/g, '-');
+            const logo = document.getElementById('config-empresa-logo').value.trim();
+            const bio = document.getElementById('config-empresa-bio').value.trim();
+
+            const { error } = await supabaseClient.from('empresas').update({
+                empresa: name, slug: slug, logo_url: logo, bio: bio
+            }).eq('id', companyId);
+
+            if (!error) {
+                alert("Perfil empresarial atualizado com sucesso!");
+                loadPerfil();
+            } else {
+                alert("Erro ao salvar perfil: " + error.message);
+            }
+        }
+
+        function copyClientLink() {
+            const linkText = document.getElementById('link-display').innerText;
+            navigator.clipboard.writeText(window.location.protocol + '//' + linkText);
+            alert("Link do cliente copiado para a área de transferência!");
+        }
+
+        // ══════════════════════════════════════════════
+        // LOGICA: ABA AGENDAMENTOS
+        // ══════════════════════════════════════════════
+        async function loadAgendamentos() {
+            const dateFilter = document.getElementById('agenda-date-filter').value;
+            const container = document.getElementById('agendamentos-table-body');
+            container.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400 animate-pulse">Carregando compromissos...</td></tr>`;
+
+            const { data, error } = await supabaseClient.from('agendamentos').select('*').eq('eid', companyId);
+            existingAppointments = data || [];
+
+            // Filtra os agendamentos localmente para bater com o dia selecionado (Ignorando Timezone Z)
+            const filtrados = existingAppointments.filter(a => {
+                if(!a.horario) return false;
+                return a.horario.substring(0, 10) === dateFilter;
+            }).sort((a,b) => a.horario.localeCompare(b.horario));
+
+            if(filtrados.length === 0) {
+                container.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 italic">Nenhum agendamento marcado para esta data.</td></tr>`;
+                return;
+            }
+
+            container.innerHTML = filtrados.map(a => {
+                const idServico = a.servicos_id || a.servico_id;
+                const srv = allServices.find(s => s.id == idServico);
+                const horaLimpa = moment(a.horario.replace('Z','')).format('HH:mm');
+                const linkWhats = `https://wa.me/${a.whatsapp.replace(/\D/g,'')}?text=${encodeURIComponent('Olá ' + a.cliente + ', confirmamos o seu agendamento às ' + horaLimpa + '!')}`;
+
+                return `
+                    <tr class="hover:bg-white/[0.02] transition-colors">
+                        <td class="p-4 pl-6 font-bold text-white">${a.cliente}</td>
+                        <td class="p-4"><span class="bg-blue-500/10 text-blue-400 border border-blue-500/10 px-2.5 py-1 rounded-md text-xs font-mono font-bold">${horaLimpa}</span></td>
+                        <td class="p-4 text-slate-300 font-semibold">${srv ? srv.servico : 'Serviço Removido'}</td>
+                        <td class="p-4 text-emerald-400 font-bold">R$ ${srv ? parseFloat(srv.valor).toFixed(2).replace('.',',') : '0,00'}</td>
+                        <td class="p-4 text-center">
+                            <a href="${linkWhats}" target="_blank" class="inline-flex items-center justify-center p-2 rounded-xl bg-green-500/10 hover:bg-green-500/20 text-green-400 transition-all active:scale-90">
+                                <i class="ph ph-whatsapp-logo text-lg font-bold"></i>
+                            </a>
+                        </td>
+                        <td class="p-4 text-center pr-6">
+                            <button onclick="deleteAgendamento(${a.id})" class="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all active:scale-90">
+                                <i class="ph ph-trash text-lg"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function deleteAgendamento(id) {
+            if (confirm("Tem certeza absoluta que deseja cancelar e excluir permanentemente este agendamento?")) {
+                const { error } = await supabaseClient.from('agendamentos').delete().eq('id', id);
+                if (!error) {
+                    loadAgendamentos();
+                } else {
+                    alert("Erro ao remover agendamento: " + error.message);
+                }
+            }
+        }
+
+        // ══════════════════════════════════════════════
+        // AGENDAMENTO MANUAL (MODAL INTERNO COM MAPA DE SLOT)
+        // ══════════════════════════════════════════════
+        function openAppointmentModal() {
+            document.getElementById('modal-agend-name').value = "";
+            document.getElementById('modal-agend-phone').value = "";
+            document.getElementById('modal-agend-date').value = moment().format('YYYY-MM-DD');
+            
+            const selectSrv = document.getElementById('modal-agend-service');
+            selectSrv.innerHTML = allServices.map(s => `<option value="${s.id}" data-time="${s.tempo}">${s.servico}</option>`).join('');
+            
+            document.getElementById('modal-agendamento').classList.remove('hidden');
+            calculateManualAvailableSlots();
+        }
+
+        function closeAppointmentModal() {
+            document.getElementById('modal-agendamento').classList.add('hidden');
+        }
+
+        function calculateManualAvailableSlots() {
+            const dateISO = document.getElementById('modal-agend-date').value;
+            const selectSrv = document.getElementById('modal-agend-service');
+            const gridTime = document.getElementById('modal-agend-time');
+            
+            if(!dateISO || !selectSrv.value) return;
+
+            const selectedOption = selectSrv.options[selectSrv.selectedIndex];
+            const duracaoServico = parseInt(selectedOption.getAttribute('data-time')) || 30;
+            const momentDayIdx = moment(dateISO).day();
+            const companyDayIdx = momentDayIdx === 0 ? 6 : momentDayIdx - 1;
+
+            const configs = businessHours.filter(h => parseInt(h.dia) === companyDayIdx);
+            gridTime.innerHTML = "";
+
+            if (configs.length === 0) {
+                gridTime.innerHTML = `<option value="">Empresa fechada neste dia</option>`;
+                return;
+            }
+
+            let slots = [];
+            configs.forEach(config => {
+                let current = moment(config.inicio, "HH:mm:ss");
+                const endHour = moment(config.fim, "HH:mm:ss");
+
+                while(current.isBefore(endHour)) {
+                    const timeStr = current.format("HH:mm");
+                    const slotStart = moment(`${dateISO} ${timeStr}`, "YYYY-MM-DD HH:mm");
+                    const slotEnd = slotStart.clone().add(duracaoServico, 'minutes');
+                    
+                    if (slotEnd.isAfter(moment(`${dateISO} ${config.fim}`, "YYYY-MM-DD HH:mm:ss"))) {
+                        current.add(30, 'minutes'); continue;
+                    }
+
+                    const isOccupied = existingAppointments.some(a => {
+                        if (!a.horario) return false;
+                        const agInicio = moment(a.horario.replace('Z', '').substring(0, 19)); 
+                        const srvDoAgend = allServices.find(s => s.id == (a.servicos_id || a.servico_id));
+                        const duracaoAgend = srvDoAgend ? (parseInt(srvDoAgend.tempo) || 30) : 30;
+                        const agFim = agInicio.clone().add(duracaoAgend, 'minutes');
+                        return (slotStart.isBefore(agFim) && slotEnd.isAfter(agInicio));
+                    });
+
+                    if(!isOccupied) slots.push(timeStr);
+                    current.add(30, 'minutes');
+                }
+            });
+
+            if (slots.length === 0) {
+                gridTime.innerHTML = `<option value="">Nenhum horário livre</option>`;
+                return;
+            }
+
+            slots.sort((a,b) => a.localeCompare(b));
+            gridTime.innerHTML = slots.map(t => `<option value="${t}">${t}</option>`).join('');
+        }
+
+        async function submitManualAppointment() {
+            const name = document.getElementById('modal-agend-name').value.trim();
+            const phone = document.getElementById('modal-agend-phone').value.replace(/\D/g,'');
+            const idServico = document.getElementById('modal-agend-service').value;
+            const date = document.getElementById('modal-agend-date').value;
+            const time = document.getElementById('modal-agend-time').value;
+
+            if (name.length < 3 || phone.length < 10 || !time) {
+                alert("Preencha todos os campos corretamente com horários válidos!");
+                return;
+            }
+
+            const timestamp = moment(`${date} ${time}`, "YYYY-MM-DD HH:mm").format("YYYY-MM-DD HH:mm:ss");
+
+            const { error } = await supabaseClient.from('agendamentos').insert({
+                eid: companyId,
+                cliente: name,
+                whatsapp: phone,
+                horario: timestamp,
+                servicos_id: parseInt(idServico),
+                status: 'confirmado'
+            });
+
+            if (!error) {
+                closeAppointmentModal();
+                loadAgendamentos();
+            } else {
+                alert("Erro ao salvar agendamento manual: " + error.message);
+            }
+        }
+
+        // ══════════════════════════════════════════════
+        // LOGICA: ABA CATALOGO DE SERVIÇOS
+        // ══════════════════════════════════════════════
+        async function loadServicos() {
+            const grid = document.getElementById('services-grid');
+            grid.innerHTML = `<p class='text-slate-400 text-xs animate-pulse'>Buscando catálogo...</p>`;
+
+            const { data, error } = await supabaseClient.from('servicos').select('*').eq('eid', companyId);
+            if (!error) {
+                allServices = data || [];
+                grid.innerHTML = allServices.map(s => `
+                    <div class="bg-slate-900 border border-white/5 rounded-2xl p-5 flex items-center justify-between shadow-lg">
+                        <div class="space-y-1">
+                            <h4 class="font-bold text-sm text-white uppercase tracking-tight">${s.servico}</h4>
+                            <div class="flex items-center gap-3 text-xs font-semibold text-slate-400">
+                                <span class="text-emerald-400 font-bold">R$ ${parseFloat(s.valor).toFixed(2).replace('.',',')}</span>
+                                <span class="w-1 h-1 bg-slate-700 rounded-full"></span>
+                                <span>${s.tempo} MINUTOS</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openServiceModal(${s.id})" class="p-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-xl transition-all active:scale-90"><i class="ph ph-pencil-simple text-base"></i></button>
+                            <button onclick="deleteServico(${s.id})" class="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all active:scale-90"><i class="ph ph-trash text-base"></i></button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function openServiceModal(id = null) {
+            const title = document.getElementById('modal-servico-title');
+            const inputId = document.getElementById('modal-servico-id');
+            const inputName = document.getElementById('modal-servico-name');
+            const inputPrice = document.getElementById('modal-servico-price');
+            const selectDur = document.getElementById('modal-servico-duration');
+
+            if (id) {
+                title.innerText = "✏️ Editar Serviço";
+                const srv = allServices.find(s => s.id === id);
+                inputId.value = srv.id;
+                inputName.value = srv.servico;
+                inputPrice.value = parseFloat(srv.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                selectDur.value = srv.tempo;
+            } else {
+                title.innerText = "🚀 Adicionar Novo Serviço";
+                inputId.value = "";
+                inputName.value = "";
+                inputPrice.value = "R$ 0,00";
+                selectDur.value = "30";
+            }
+            document.getElementById('modal-servico').classList.remove('hidden');
+        }
+
+        function closeServiceModal() {
+            document.getElementById('modal-servico').classList.add('hidden');
+        }
+
+        async function submitServiceForm() {
+            const id = document.getElementById('modal-servico-id').value;
+            const name = document.getElementById('modal-servico-name').value.trim();
+            const rawPrice = document.getElementById('modal-servico-price').value.replace(/\D/g, '');
+            const preco = parseFloat((parseInt(rawPrice) || 0) / 100).toFixed(2);
+            const tempo = parseInt(document.getElementById('modal-servico-duration').value);
+
+            if (name.length < 3 || preco <= 0) return alert("Insira configurações de serviços válidas!");
+
+            let res;
+            if (id) {
+                res = await supabaseClient.from('servicos').update({ servico: name, valor: preco, tempo: tempo }).eq('id', id);
+            } else {
+                res = await supabaseClient.from('servicos').insert({ eid: companyId, servico: name, valor: preco, tempo: tempo });
+            }
+
+            if (!res.error) {
+                closeServiceModal();
+                loadServicos();
+            } else {
+                alert("Erro ao salvar serviço: " + res.error.message);
+            }
+        }
+
+        async function deleteServico(id) {
+            if (confirm("Deseja apagar este serviço? Agendamentos vinculados a ele podem ficar sem identificação.")) {
+                const { error } = await supabaseClient.from('servicos').delete().eq('id', id);
+                if (!error) loadServicos();
+            }
+        }
+
+        // ══════════════════════════════════════════════
+        // LOGICA: ABA EXPEDIENTE E HORÁRIOS
+        // ══════════════════════════════════════════════
+        async function loadHorariosView() {
+            const container = document.getElementById('horarios-container');
+            container.innerHTML = "";
+
+            // Cria dinamicamente as linhas de Domingo a Sábado mapeando os índices (0=Segunda ... 6=Domingo)
+            daysOfWeek.forEach((dayName, index) => {
+                const idxBanco = index === 6 ? 6 : index; // Mapeamento estruturado
+                const rowsDia = businessHours.filter(h => parseInt(h.dia) === idxBanco);
+                
+                // Consolida dados ou assume fallback inicial se não houver registros
+                const configurado = rowsDia.length > 0;
+                const inicio = configurado ? rowsDia[0].inicio : '08:00:00';
+                const fim = configurado ? rowsDia[rowsDia.length - 1].fim : '18:00:00';
+                
+                // Procura por pausas fracionadas no banco (Almoço)
+                let pausaInicio = '12:00:00';
+                let painaFim = '13:00:00';
+                if(rowsDia.length > 1) {
+                    pausaInicio = rowsDia[0].fim;
+                    painaFim = rowsDia[1].inicio;
+                }
+
+                const row = document.createElement('div');
+                row.className = "day-config-row flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-5 bg-slate-900 border border-white/5 rounded-2xl transition-all";
+                row.dataset.diaIdx = idxBanco;
+                row.innerHTML = `
+                    <div class="flex items-center gap-3 w-40">
+                        <input type="checkbox" id="check-dia-${idxBanco}" ${configurado ? 'checked' : ''} onchange="markHorariosAsDirty()" class="w-4 h-4 rounded accent-blue-500 bg-slate-950 border-white/10">
+                        <label for="check-dia-${idxBanco}" class="font-bold text-sm text-slate-200 uppercase tracking-tight">${dayName}</label>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500">
+                        <div class="flex items-center gap-2">
+                            <span>ENTRADA:</span>
+                            <select class="sel-inicio bg-slate-950 border border-white/10 p-2 rounded-lg text-slate-200 font-mono text-xs">${generateDropdownTimeOptions(inicio)}</select>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span>ALMOÇO:</span>
+                            <select class="sel-pausa-in bg-slate-950 border border-white/10 p-2 rounded-lg text-slate-200 font-mono text-xs">${generateDropdownTimeOptions(pausaInicio)}</select>
+                            <span>ATÉ</span>
+                            <select class="sel-pausa-fim bg-slate-950 border border-white/10 p-2 rounded-lg text-slate-200 font-mono text-xs">${generateDropdownTimeOptions(painaFim)}</select>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span>SAÍDA:</span>
+                            <select class="sel-fim bg-slate-950 border border-white/10 p-2 rounded-lg text-slate-200 font-mono text-xs">${generateDropdownTimeOptions(fim)}</select>
+                        </div>
+                    </div>
+                `;
+                
+                // Adiciona gatilhos nos dropdowns para ouvir edições
+                row.querySelectorAll('select').forEach(s => s.addEventListener('change', markHorariosAsDirty));
+                container.appendChild(row);
+            });
+        }
+
+        function markHorariosAsDirty() {
+            isHorariosDirty = true;
+        }
+
+        async function saveAllHorarios() {
+            document.getElementById('global-loader').classList.remove('hidden');
+            
+            // 1. Limpa o escopo de horários antigos do banco para reinjetar a malha limpa fracionada
+            await supabaseClient.from('horarios').delete().eq('eid', companyId);
+
+            const rows = document.querySelectorAll('.day-config-row');
+            let inserts = [];
+
+            rows.forEach(row => {
+                const idxBanco = parseInt(row.dataset.diaIdx);
+                const ativo = row.querySelector(`#check-dia-${idxBanco}`).checked;
+
+                if (ativo) {
+                    const inicio = row.querySelector('.sel-inicio').value;
+                    const pausaIn = row.querySelector('.sel-pausa-in').value;
+                    const pausaFim = row.querySelector('.sel-pausa-fim').value;
+                    const fim = row.querySelector('.sel-fim').value;
+
+                    // Turno 1: Manhã (Da Entrada até o Início do Almoço)
+                    inserts.push({ eid: companyId, dia: idxBanco, inicio: inicio, fim: pausaIn });
+                    // Turno 2: Tarde (Do Fim do Almoço até a Saída Geral)
+                    inserts.push({ eid: companyId, dia: idxBanco, inicio: pausaFim, fim: fim });
+                }
+            });
+
+            if(inserts.length > 0) {
+                const { error } = await supabaseClient.from('horarios').insert(inserts);
+                if(error) alert("Erro ao salvar malha de horários: " + error.message);
+            }
+
+            // Recarrega o estado atualizado do banco
+            const { data } = await supabaseClient.from('horarios').select('*').eq('eid', companyId);
+            businessHours = data || [];
+            
+            isHorariosDirty = false;
+            await loadHorariosView();
+            document.getElementById('global-loader').classList.add('hidden');
+            alert("Agenda e horários consolidados com sucesso!");
+        }
+
+        // ══════════════════════════════════════════════
+        // HELPERS: DROPDOWNS, MASCARAS E INTERFACES
+        // ══════════════════════════════════════════════
+        function populateDurationDropdowns() {
+            const selectSrv = document.getElementById('modal-servico-duration');
+            let options = "";
+            for (let i = 30; i <= 360; i += 30) {
+                options += `<option value="${i}">${i >= 60 ? Math.floor(i/60) + 'h ' + (i%60 > 0 ? (i%60)+'min' : '') : i + ' min'}</option>`;
+            }
+            selectSrv.innerHTML = options;
+        }
+
+        function generateDropdownTimeOptions(selectedTime) {
+            let options = "";
+            const cleanSelected = selectedTime.substring(0, 5); // Padroniza formato HH:mm
+            for (let i = 0; i < 24; i++) {
+                const hr = `${i.toString().padStart(2, '0')}:00`;
+                options += `<option value="${hr}:00" ${hr === cleanSelected ? 'selected' : ''}>${hr}</option>`;
+                const min = `${i.toString().padStart(2, '0')}:30`;
+                options += `<option value="${min}:00" ${min === cleanSelected ? 'selected' : ''}>${min}</option>`;
+            }
+            return options;
+        }
+
+        function maskPhone(i) {
+            let v = i.value.replace(/\D/g, "").substring(0, 11);
+            if (v.length > 10) i.value = `(${v.substring(0, 2)}) ${v.substring(2, 7)}-${v.substring(7, 11)}`;
+            else if (v.length > 2) i.value = `(${v.substring(0, 2)}) ${v.substring(2)}`;
+            else i.value = v;
+        }
+
+        function maskCurrency(i) {
+            let val = i.value.replace(/\D/g, '');
+            if (parseInt(val) > 100000) val = '100000'; // Trava automática de segurança (Mágico)
+            let f = (parseInt(val) || 0) / 100;
+            i.value = f.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function handleLogout() {
+            if (confirm("Deseja encerrar a sessão e sair do Painel Administrativo?")) {
+                window.location.href = "index.html";
+            }
+        }
+
+        window.onload = initDashboard;
+    </script>
+</body>
+</html>
