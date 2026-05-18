@@ -191,6 +191,7 @@
         let companyId, companyData, businessHours = [], existingAppointments = [];
         let currentStep = 1, selectedProName = "", selectedDate = "", selectedTimeValue = "";
         let hasColaboradores = false, displayedDaysCount = 0, currentServiceDuration = 30;
+        let allServices = []; // Nova variável global para guardar os dados dos serviços
 
         function convertToCompanyDayIdx(momentDay) { return momentDay === 0 ? 6 : momentDay - 1; }
 
@@ -265,18 +266,19 @@
                 
                 selectedProName = hasColaboradores ? "" : nomeEmpresa;
 
-                // Busca Serviços por 'eid'
+                // Busca Serviços por 'eid' e salva na variável global
                 const { data: servs = [] } = await supabaseClient.from('servicos').select('*').eq('eid', companyId);
-                renderServices(servs || []);
+                allServices = servs || [];
+                renderServices(allServices);
                 
-                // ATUALIZADO: Busca Horários apontando dinamicamente para 'eid'
+                // Busca Horários
                 const { data: hrs = [] } = await supabaseClient.from('horarios').select('*').eq('eid', companyId);
                 businessHours = hrs || [];
 
-                // Busca Agendamentos existentes de forma flexível
-                let { data: agends, error: errAgends } = await supabaseClient.from('agendamentos').select('data_hora, profissional_nome').eq('eid', companyId);
+                // ATUALIZADO: Puxa o 'servico_id' para conseguirmos cruzar com a duração do serviço dele
+                let { data: agends, error: errAgends } = await supabaseClient.from('agendamentos').select('data_hora, profissional_nome, servico_id').eq('eid', companyId);
                 if (errAgends || !agends) {
-                    const { data: agendsFallback } = await supabaseClient.from('agendamentos').select('data_hora, profissional_nome').eq('empresa_id', companyId);
+                    const { data: agendsFallback } = await supabaseClient.from('agendamentos').select('data_hora, profissional_nome, servico_id').eq('empresa_id', companyId);
                     agends = agendsFallback;
                 }
                 existingAppointments = agends || [];
@@ -292,7 +294,7 @@
             }
         }
 
-        // ATUALIZADO: Mapeado para ler 'dia', 'inicio' e 'fim' da tabela de horários
+        // ATUALIZADO: Lógica de conflito dinâmico baseada no tempo do serviço marcado
         function getAvailableSlots(dateISO, momentDayIdx) {
             const config = businessHours.find(h => parseInt(h.dia) === convertToCompanyDayIdx(momentDayIdx));
             if(!config) return [];
@@ -308,15 +310,24 @@
                 const slotStart = moment(`${dateISO} ${timeStr}`, "YYYY-MM-DD HH:mm");
                 const slotEnd = slotStart.clone().add(currentServiceDuration, 'minutes');
                 
+                // Se a duração do serviço atual passar do horário de encerramento, invalida o bloco
                 if (slotEnd.isAfter(moment(`${dateISO} ${config.fim}`, "YYYY-MM-DD HH:mm:ss"))) {
                     current.add(30, 'minutes'); continue;
                 }
 
                 const isPaused = pStart && pEnd && (slotStart.isBefore(pEnd.clone().set({year: slotStart.year(), month: slotStart.month(), date: slotStart.date()})) && slotEnd.isAfter(pStart.clone().set({year: slotStart.year(), month: slotStart.month(), date: slotStart.date()})));
                 
+                // Verificação de ocupação baseada no tamanho real do agendamento comprometido
                 const isOccupied = existingAppointments.some(a => {
                     const agInicio = moment(a.data_hora); 
-                    const agFim = agInicio.clone().add(30, 'minutes'); 
+                    
+                    // Cruza o servico_id com a nossa lista global para descobrir o tempo gasto
+                    const servicoDoAgendamento = allServices.find(s => s.id == a.servico_id);
+                    const duracaoAgendamento = servicoDoAgendamento ? (parseInt(servicoDoAgendamento.tempo) || 30) : 30;
+                    
+                    const agFim = agInicio.clone().add(duracaoAgendamento, 'minutes');
+                    
+                    // Verifica se há colisão entre o bloco atual pesquisado e o intervalo ocupado
                     const conflito = (slotStart.isBefore(agFim) && slotEnd.isAfter(agInicio));
                     
                     return hasColaboradores ? (conflito && a.profissional_nome === selectedProName) : conflito;
@@ -328,7 +339,6 @@
             return slots;
         }
 
-        // ATUALIZADO: Mapeado para filtrar usando a coluna 'dia'
         function generateCalendar(count, clear = false) {
             const grid = document.getElementById('calendar-grid');
             if(clear) { grid.innerHTML = ""; displayedDaysCount = 0; }
@@ -540,10 +550,9 @@
         function openMaps() { 
             if(!companyData || !companyData.endereco_rua) return alert("Endereço não cadastrado."); 
             const address = `${companyData.endereco_rua}, ${companyData.endereco_numero}, ${companyData.endereco_cidade} - ${companyData.endereco_estado}`;
-            window.open(`http://maps.google.com/?q=${encodeURIComponent(address)}`, '_blank'); 
+            window.open('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address), '_blank'); 
         }
 
-        // Correção sintática e de link na abertura do Google Maps externo
         function toggleContactModal() { document.getElementById('contact-modal').classList.toggle('hidden'); }
         
         window.onload = loadAllData;
