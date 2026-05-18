@@ -192,7 +192,6 @@
         let currentStep = 1, selectedProName = "", selectedDate = "", selectedTimeValue = "";
         let hasColaboradores = false, displayedDaysCount = 0, currentServiceDuration = 30;
         let allServices = [];
-        window.detectedDataColumn = 'data'; // Detecção inteligente de coluna de data
 
         function convertToCompanyDayIdx(momentDay) { return momentDay === 0 ? 6 : momentDay - 1; }
 
@@ -274,20 +273,9 @@
                 const { data: hrs = [] } = await supabaseClient.from('horarios').select('*').eq('eid', companyId);
                 businessHours = hrs || [];
 
-                // Puxa tudo de agendamentos para mapear as colunas dinamicamente
-                let { data: agends, error: errAgends } = await supabaseClient.from('agendamentos').select('*').eq('eid', companyId);
-                if (errAgends || !agends) {
-                    const { data: agendsFallback } = await supabaseClient.from('agendamentos').select('*').eq('empresa_id', companyId);
-                    agends = agendsFallback;
-                }
+                // Lendo a coluna correta de agendamentos: 'horario'
+                const { data: agends = [] } = await supabaseClient.from('agendamentos').select('horario, servico_id').eq('eid', companyId);
                 existingAppointments = agends || [];
-
-                // ANALISADOR DINÂMICO DE SCHEMA CACHE (Descobre o nome real da sua coluna de data)
-                if (existingAppointments.length > 0) {
-                    const chavesDaTabela = Object.keys(existingAppointments[0]);
-                    const encontrada = chavesDaTabela.find(k => k === 'data' || k === 'data_horario' || k === 'horario' || k === 'data_hora');
-                    if (encontrada) window.detectedDataColumn = encontrada;
-                }
 
                 updateStepNumbers();
                 document.getElementById('loading-screen').classList.add('hidden');
@@ -321,18 +309,14 @@
                 const isPaused = pStart && pEnd && (slotStart.isBefore(pEnd.clone().set({year: slotStart.year(), month: slotStart.month(), date: slotStart.date()})) && slotEnd.isAfter(pStart.clone().set({year: slotStart.year(), month: slotStart.month(), date: slotStart.date()})));
                 
                 const isOccupied = existingAppointments.some(a => {
-                    // Pega o valor usando a coluna dinâmica detectada
-                    const valorDataCru = a[window.detectedDataColumn || 'data'];
-                    if (!valorDataCru) return false; // CORREÇÃO DO ERRO 1: Evita travar os horários da tarde se o valor for nulo
+                    if (!a.horario) return false; // Bloqueia falsos conflitos nulos/indefinidos
 
-                    const agInicio = moment(valorDataCru); 
+                    const agInicio = moment(a.horario); 
                     const servicoDoAgendamento = allServices.find(s => s.id == a.servico_id);
                     const duracaoAgendamento = servicoDoAgendamento ? (parseInt(servicoDoAgendamento.tempo) || 30) : 30;
                     
                     const agFim = agInicio.clone().add(duracaoAgendamento, 'minutes');
-                    const conflito = (slotStart.isBefore(agFim) && slotEnd.isAfter(agInicio));
-                    
-                    return hasColaboradores ? (conflito && a.profissional_nome === selectedProName) : conflito;
+                    return (slotStart.isBefore(agFim) && slotEnd.isAfter(agInicio));
                 });
 
                 if(!isPaused && !isOccupied) slots.push(timeStr);
@@ -371,7 +355,6 @@
 
         function loadMoreDays() { generateCalendar(8, false); }
 
-        // SALVAMENTO SEGURO CONTRA ERROS DE SCHEMA CACHE
         async function saveAndFinish() {
             const name = document.getElementById('client-name').value.trim().toUpperCase();
             const phone = document.getElementById('client-phone').value;
@@ -385,59 +368,24 @@
             btn.disabled = true; btn.innerText = "AGUARDE...";
             
             const dataParaSalvar = moment(`${selectedDate} ${selectedTimeValue}`, "YYYY-MM-DD HH:mm").format("YYYY-MM-DD HH:mm:ss");
-
-            // Função interna recursiva para testar os nomes de colunas mais prováveis se falhar
-            async function tentarInserir(nomeColunaData) {
-                let payload = {
-                    nome_cliente: name, 
-                    whatsapp_cliente: phone.replace(/\D/g,''),
-                    profissional_nome: selectedProName,
-                    status: 'pendente', 
-                    servico_id: service.getAttribute('data-id')
-                };
-                
-                payload[nomeColunaData] = dataParaSalvar;
-
-                // Define dinamicamente o ID da empresa ativo
-                if (existingAppointments.length > 0 && Object.keys(existingAppointments[0]).includes('empresa_id')) {
-                    payload.empresa_id = companyId;
-                } else {
-                    payload.eid = companyId;
-                }
-
-                let response = await supabaseClient.from('agendamentos').insert(payload);
-                
-                // Se der erro de coluna inválida, remove o eid e tenta com o empresa_id invertido
-                if (response.error && response.error.message.includes('column "eid"')) {
-                    delete payload.eid;
-                    payload.empresa_id = companyId;
-                    response = await supabaseClient.from('agendamentos').insert(payload);
-                }
-                return response;
-            }
             
             try {
-                // Tenta primeiro com o que foi detectado ou padrão 'data'
-                let res = await tentarInserir(window.detectedDataColumn || 'data');
-                
-                // CORREÇÃO DO ERRO 2: Se falhar por erro de cache/coluna inexistente, tenta os fallbacks estruturais automaticamente
-                if (res.error && (res.error.message.includes('column') || res.error.message.includes('cache'))) {
-                    const colunasAlternativas = ['data_horario', 'horario', 'data', 'data_hora'].filter(c => c !== window.detectedDataColumn);
-                    for (let col of colunasAlternativas) {
-                        res = await tentarInserir(col);
-                        if (!res.error) {
-                            window.detectedDataColumn = col; // Atualiza globalmente o nome certo para as próximas vezes
-                            break;
-                        }
-                    }
-                }
+                // Inserção apontando para as colunas certas do seu novo SQL estruturado
+                const { error } = await supabaseClient.from('agendamentos').insert({
+                    eid: companyId,
+                    cliente: name,
+                    whatsapp: phone.replace(/\D/g,''),
+                    horario: dataParaSalvar,
+                    servico_id: service.getAttribute('data-id'),
+                    status: 'pendente'
+                });
 
-                if (res.error) throw new Error(res.error.message);
+                if (error) throw new Error(error.message);
 
                 document.getElementById('app-content').classList.add('hidden');
                 document.getElementById('step-success').classList.remove('hidden');
                 const msg = encodeURIComponent(`Olá! Novo agendamento:\n👤 Cliente: ${name}\n📅 Data: ${moment(selectedDate).format('DD/MM')}\n⏰ Hora: ${selectedTimeValue}`);
-                setTimeout(() => { window.open(`https://wa.me/${companyData.whatsapp.replace(/\D/g,'')}?text=${msg}`, '_blank'); location.reload(); }, 2000);
+                setTimeout(() => { window.open('https://wa.me/' + companyData.whatsapp.replace(/\D/g,'') + '?text=' + msg, '_blank'); location.reload(); }, 2000);
             } catch (e) { 
                 alert("Erro ao salvar agendamento: " + e.message); 
                 btn.disabled = false; 
@@ -536,11 +484,12 @@
             if(counters.length) { counters.forEach(c => c.innerText = `PASSO ${currentStep} DE ${total}`); }
         }
 
+        // Removidos os IDs antigos que ocultavam o cabeçalho no fluxo para manter o topo fixo e estável
         function processFlow() {
             const btnText = document.getElementById('main-action-btn');
             if (currentStep === 1) {
                 if (document.querySelectorAll('.service-checkbox:checked').length === 0) return;
-                ['step-services','header-buttons','notices-section'].forEach(id => document.getElementById(id).classList.add('step-hidden'));
+                ['step-services'].forEach(id => document.getElementById(id).classList.add('step-hidden'));
                 document.getElementById('back-btn').classList.remove('step-hidden');
                 if (hasColaboradores) { document.getElementById('step-pro').classList.remove('step-hidden'); currentStep = 2; }
                 else { document.getElementById('step-date').classList.remove('step-hidden'); currentStep = 3; }
@@ -562,8 +511,7 @@
             const btnText = document.getElementById('main-action-btn');
             if (currentStep === 2 || (currentStep === 3 && !hasColaboradores)) { 
                 ['step-pro','step-date'].forEach(id => document.getElementById(id).classList.add('step-hidden')); 
-                ['step-services','header-buttons'].forEach(id => document.getElementById(id).classList.remove('step-hidden')); 
-                if (companyData.avisos && companyData.avisos.trim().length > 0) document.getElementById('notices-section').classList.remove('hidden');
+                ['step-services'].forEach(id => document.getElementById(id).classList.remove('step-hidden')); 
                 document.getElementById('back-btn').classList.add('step-hidden'); currentStep = 1; 
                 btnText.innerText = "CONTINUAR";
             } else if (currentStep === 3) { 
