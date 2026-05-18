@@ -9,6 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
         :root { --primary-color: #0f172a; }
@@ -164,7 +165,7 @@
     <div id="step-success" class="fixed inset-0 bg-white z-[300] flex flex-col items-center justify-center p-8 text-center hidden">
         <div class="check-circle mb-6"><i class="ph ph-check text-white text-3xl font-bold"></i></div>
         <h2 class="text-2xl font-extrabold text-slate-900 mb-2 tracking-tight uppercase">Agendado!</h2>
-        <p class="text-slate-500 text-sm font-medium">Abrindo WhatsApp...</p>
+        <p id="success-msg-text" class="text-slate-500 text-sm font-medium">Abrindo WhatsApp...</p>
     </div>
 
     <div id="contact-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6 hidden">
@@ -282,7 +283,6 @@
             }
         }
 
-        // BLOQUEIO SEGURO E SUPORTE A MÚLTIPLOS TURNOS (ALMOÇO)
         function getAvailableSlots(dateISO, momentDayIdx) {
             const configs = businessHours.filter(h => parseInt(h.dia) === convertToCompanyDayIdx(momentDayIdx));
             if(configs.length === 0) return [];
@@ -303,12 +303,10 @@
                         continue;
                     }
 
-                    // CORREÇÃO DO BLOQUEIO EM MASSA: Ignora o fuso horário textual (+00) para evitar desalinhar a verificação
                     const isOccupied = existingAppointments.some(a => {
                         const dataComprometida = a.horario || a.data_hora || a.data;
                         if (!dataComprometida) return false;
 
-                        // Extrai a data textual limpa removendo o "Z" ou offsets para bater 100% com o slot do front-end
                         const dataLimpa = dataComprometida.replace('Z', '').substring(0, 19);
                         const agInicio = moment(dataLimpa); 
                         
@@ -358,7 +356,7 @@
 
         function loadMoreDays() { generateCalendar(8, false); }
 
-        // SALVAMENTO SEGURO — TRATAMENTO DE ERROS DE COLUNA SINGULAR/PLURAL
+        // REMOVIDO O REFRESH DAQUI PARA TRAVAR NA TELA VERDE DE SUCESSO COMFORTAVELMENTE
         async function saveAndFinish() {
             const name = document.getElementById('client-name').value.trim().toUpperCase();
             const phone = document.getElementById('client-phone').value;
@@ -382,11 +380,9 @@
             };
 
             try {
-                // Tenta injetar via servicos_id (Plural)
                 payload.servicos_id = parseInt(service.getAttribute('data-id'));
                 let response = await supabaseClient.from('agendamentos').insert(payload);
                 
-                // FALLBACK AUTOMÁTICO: Caso acuse erro na coluna por cache, inverte para servico_id (Singular)
                 if (response.error && (response.error.message.includes('column') || response.error.message.includes('cache'))) {
                     delete payload.servicos_id;
                     payload.servico_id = parseInt(service.getAttribute('data-id'));
@@ -399,7 +395,11 @@
                 document.getElementById('app-content').classList.add('hidden');
                 document.getElementById('step-success').classList.remove('hidden');
                 const msg = encodeURIComponent(`Olá! Novo agendamento:\n👤 Cliente: ${name}\n📅 Data: ${moment(selectedDate).format('DD/MM')}\n⏰ Hora: ${selectedTimeValue}`);
-                setTimeout(() => { window.open('https://wa.me/' + companyData.whatsapp.replace(/\D/g,'') + '?text=' + msg, '_blank'); location.reload(); }, 2000);
+                
+                setTimeout(() => { 
+                    window.open('https://wa.me/' + companyData.whatsapp.replace(/\D/g,'') + '?text=' + msg, '_blank'); 
+                    document.getElementById('success-msg-text').innerText = "Agendamento concluído com sucesso!";
+                }, 2000);
             } catch (e) { 
                 alert("Erro ao salvar agendamento: " + e.message); 
                 btn.disabled = false; 
