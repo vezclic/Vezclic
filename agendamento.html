@@ -9,7 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2 family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
         :root { --primary-color: #0f172a; }
@@ -265,14 +265,20 @@
                 
                 selectedProName = hasColaboradores ? "" : nomeEmpresa;
 
-                // ALTERADO: Puxa usando a coluna correta 'eid' mapeada do seu banco de dados
+                // Busca Serviços por 'eid'
                 const { data: servs = [] } = await supabaseClient.from('servicos').select('*').eq('eid', companyId);
                 renderServices(servs || []);
                 
-                const { data: hrs = [] } = await supabaseClient.from('horarios').select('*').eq('empresa_id', companyId);
+                // ATUALIZADO: Busca Horários apontando dinamicamente para 'eid'
+                const { data: hrs = [] } = await supabaseClient.from('horarios').select('*').eq('eid', companyId);
                 businessHours = hrs || [];
 
-                const { data: agends = [] } = await supabaseClient.from('agendamentos').select('data_hora, profissional_nome').eq('empresa_id', companyId);
+                // Busca Agendamentos existentes de forma flexível
+                let { data: agends, error: errAgends } = await supabaseClient.from('agendamentos').select('data_hora, profissional_nome').eq('eid', companyId);
+                if (errAgends || !agends) {
+                    const { data: agendsFallback } = await supabaseClient.from('agendamentos').select('data_hora, profissional_nome').eq('empresa_id', companyId);
+                    agends = agendsFallback;
+                }
                 existingAppointments = agends || [];
 
                 updateStepNumbers();
@@ -286,13 +292,14 @@
             }
         }
 
+        // ATUALIZADO: Mapeado para ler 'dia', 'inicio' e 'fim' da tabela de horários
         function getAvailableSlots(dateISO, momentDayIdx) {
-            const config = businessHours.find(h => parseInt(h.dia_semana) === convertToCompanyDayIdx(momentDayIdx));
-            if(!config || !config.ativo) return [];
+            const config = businessHours.find(h => parseInt(h.dia) === convertToCompanyDayIdx(momentDayIdx));
+            if(!config) return [];
 
             let slots = [];
-            let current = moment(config.abre_as, "HH:mm:ss");
-            const endHour = moment(config.fecha_as, "HH:mm:ss");
+            let current = moment(config.inicio, "HH:mm:ss");
+            const endHour = moment(config.fim, "HH:mm:ss");
             const pStart = config.pausa_inicio && config.pausa_inicio !== "NULL" && config.pausa_inicio !== null ? moment(config.pausa_inicio, "HH:mm:ss") : null;
             const pEnd = config.pausa_fim && config.pausa_fim !== "NULL" && config.pausa_fim !== null ? moment(config.pausa_fim, "HH:mm:ss") : null;
 
@@ -301,7 +308,7 @@
                 const slotStart = moment(`${dateISO} ${timeStr}`, "YYYY-MM-DD HH:mm");
                 const slotEnd = slotStart.clone().add(currentServiceDuration, 'minutes');
                 
-                if (slotEnd.isAfter(moment(`${dateISO} ${config.fecha_as}`, "YYYY-MM-DD HH:mm:ss"))) {
+                if (slotEnd.isAfter(moment(`${dateISO} ${config.fim}`, "YYYY-MM-DD HH:mm:ss"))) {
                     current.add(30, 'minutes'); continue;
                 }
 
@@ -321,6 +328,7 @@
             return slots;
         }
 
+        // ATUALIZADO: Mapeado para filtrar usando a coluna 'dia'
         function generateCalendar(count, clear = false) {
             const grid = document.getElementById('calendar-grid');
             if(clear) { grid.innerHTML = ""; displayedDaysCount = 0; }
@@ -332,11 +340,11 @@
                 const targetDate = baseDate.clone().add(displayedDaysCount, 'days');
                 const momentDayIdx = targetDate.day();
                 const dateISO = targetDate.format("YYYY-MM-DD");
-                const configDia = businessHours.find(h => parseInt(h.dia_semana) === convertToCompanyDayIdx(momentDayIdx));
+                const configDia = businessHours.find(h => parseInt(h.dia) === convertToCompanyDayIdx(momentDayIdx));
                 const slotsDisponiveis = getAvailableSlots(dateISO, momentDayIdx);
 
                 const btn = document.createElement('button');
-                if (configDia?.ativo && slotsDisponiveis.length > 0) {
+                if (configDia && slotsDisponiveis.length > 0) {
                     btn.className = "date-btn py-2.5 px-4 bg-white border border-slate-100 rounded-2xl transition-all flex flex-col items-center justify-center active:scale-95";
                     btn.onclick = () => selectDate(btn, dateISO, momentDayIdx);
                 } else {
@@ -366,15 +374,23 @@
             try {
                 const dataParaSalvar = moment(`${selectedDate} ${selectedTimeValue}`, "YYYY-MM-DD HH:mm").format("YYYY-MM-DD HH:mm:ss");
                 
-                const { error } = await supabaseClient.from('agendamentos').insert({
-                    empresa_id: companyId, 
+                let payload = {
                     nome_cliente: name, 
                     whatsapp_cliente: phone.replace(/\D/g,''),
                     data_hora: dataParaSalvar, 
                     profissional_nome: selectedProName,
                     status: 'pendente', 
-                    servico_id: service.getAttribute('data-id')
-                });
+                    servico_id: service.getAttribute('data-id'),
+                    eid: companyId
+                };
+                
+                let { error } = await supabaseClient.from('agendamentos').insert(payload);
+                if (error && error.message.includes('column "eid" does not exist')) {
+                    delete payload.eid;
+                    payload.empresa_id = companyId;
+                    const retry = await supabaseClient.from('agendamentos').insert(payload);
+                    error = retry.error;
+                }
 
                 if (error) throw new Error(error.message);
 
@@ -437,7 +453,6 @@
             generateCalendar(8, true);
         }
 
-        // ALTERADO: Mapeado as variáveis internas usando 'tempo', 'valor' e 'servico' vindos da sua tabela real
         function renderServices(list = []) {
             const container = document.getElementById('services-list');
             if(!list || !list.length) { container.innerHTML = "<p class='text-center text-slate-400 text-xs py-4'>Nenhum serviço cadastrado.</p>"; return; }
@@ -462,7 +477,7 @@
 
         function renderProfessionals(pros = [], owner = {}) {
             const container = document.getElementById('pros-list');
-            const ownerName = owner.nome_empresa || "Geral";
+            const ownerName = owner.empresa || "Geral";
             let html = `<button onclick="selectPro(this, '${ownerName}')" class="pro-btn p-5 bg-white border border-slate-100 rounded-3xl text-center flex flex-col items-center"><div class="w-14 h-14 rounded-full overflow-hidden mb-2 shadow-sm border-2 border-white"><img src="${owner.logo_url || ''}" onerror="this.src='https://placehold.co/200x200?text=Logo'" class="w-full h-full object-cover"></div><p class="font-bold text-[10px] text-slate-800 uppercase tracking-tighter truncate w-full">${ownerName.split(' ')[0]}</p></button>`;
             if (pros && pros.length) {
                 html += pros.map(p => `<button onclick="selectPro(this, '${p.nome}')" class="pro-btn p-5 bg-white border border-slate-100 rounded-3xl text-center flex flex-col items-center"><div class="w-14 h-14 rounded-full overflow-hidden mb-2 shadow-sm border-2 border-white"><img src="${p.foto_url || ''}" onerror="this.src='https://placehold.co/200x200?text=Foto'" class="w-full h-full object-cover"></div><p class="font-bold text-[10px] text-slate-800 uppercase tracking-tighter truncate w-full">${p.nome.split(' ')[0]}</p></button>`).join('');
@@ -525,9 +540,10 @@
         function openMaps() { 
             if(!companyData || !companyData.endereco_rua) return alert("Endereço não cadastrado."); 
             const address = `${companyData.endereco_rua}, ${companyData.endereco_numero}, ${companyData.endereco_cidade} - ${companyData.endereco_estado}`;
-            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank'); 
+            window.open(`http://maps.google.com/?q=${encodeURIComponent(address)}`, '_blank'); 
         }
 
+        // Correção sintática e de link na abertura do Google Maps externo
         function toggleContactModal() { document.getElementById('contact-modal').classList.toggle('hidden'); }
         
         window.onload = loadAllData;
