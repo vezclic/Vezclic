@@ -127,8 +127,7 @@
                                     <th class="p-4 text-center pr-6">Ações</th>
                                 </tr>
                             </thead>
-                            <tbody id="agendamentos-table-body" class="divide-y divide-white/5 font-medium text-slate-200">
-                                </tbody>
+                            <tbody id="agendamentos-table-body" class="divide-y divide-white/5 font-medium text-slate-200"></tbody>
                         </table>
                     </div>
                 </div>
@@ -174,7 +173,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-wide">Nome de Usuário (Slug URL)</label>
-                            <input type="text" id="config-empresa-slug" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3.5 text-sm text-slate-200 outline-none focus:border-blue-500 transition-colors">
+                            <input type="text" id="config-empresa-slug" placeholder="ex: encanto-festas" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3.5 text-sm text-slate-200 outline-none focus:border-blue-500 transition-colors">
                         </div>
                     </div>
                     <div>
@@ -220,9 +219,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Horários Disponíveis no Mapa</label>
-                    <select id="modal-agend-time" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-slate-200 outline-none focus:border-blue-500">
-                        <option value="">Selecione a data primeiro...</option>
-                    </select>
+                    <select id="modal-agend-time" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-slate-200 outline-none focus:border-blue-500"></select>
                 </div>
             </div>
             <button onclick="submitManualAppointment()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl uppercase text-xs tracking-wider transition-all active:scale-95 shadow-lg shadow-blue-500/10">Confirmar e Inserir na Agenda</button>
@@ -259,7 +256,7 @@
         const supabaseKey = 'sb_publishable_v16thezDVJS97xDtzo8SmA_X9tz3G4M';
         const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
-        let companyId = 8;
+        let companyId = 8; // ID da sua empresa conforme visto na base
         let currentTab = 'agendamentos';
         let isHorariosDirty = false;
         const daysOfWeek = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
@@ -270,14 +267,11 @@
         // ══════════════════════════════════════════════
         async function checkAuth() {
             const { data: { session } } = await supabaseClient.auth.getSession();
-            
             if (!session) {
-                // Esconde layout, mostra tela de login do Google
                 document.getElementById('app-wrapper').classList.add('hidden');
                 document.getElementById('login-screen').classList.remove('hidden');
                 document.getElementById('global-loader').classList.add('hidden');
             } else {
-                // Usuário autenticado, roda o app normalmente
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('app-wrapper').classList.remove('hidden');
                 await initDashboard();
@@ -286,45 +280,39 @@
 
         async function loginWithGoogle() {
             document.getElementById('global-loader').classList.remove('hidden');
-            const { error } = await supabaseClient.auth.signInWithOAuth({
+            await supabaseClient.auth.signInWithOAuth({
                 provider: 'google',
-                options: {
-                    redirectTo: window.location.href
-                }
+                options: { redirectTo: window.location.href }
             });
-            if (error) {
-                document.getElementById('global-loader').classList.add('hidden');
-                alert("Erro ao abrir autenticação do Google: " + error.message);
-            }
         }
 
         async function handleLogout() {
-            if (confirm("Deseja encerrar a sessão e sair do Painel Administrativo?")) {
+            if (confirm("Deseja encerrar a sessão?")) {
                 document.getElementById('global-loader').classList.remove('hidden');
                 await supabaseClient.auth.signOut();
                 window.location.reload();
             }
         }
 
-        // Escuta mudanças de estado do Supabase em tempo real
-        supabaseClient.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_IN') checkAuth();
-        });
-
         async function initDashboard() {
             document.getElementById('agenda-date-filter').value = moment().format('YYYY-MM-DD');
             populateDurationDropdowns();
-            await loadPerfil();
-            await loadAgendamentos();
-            await loadServicos();
-            await loadHorariosView();
+            
+            // EXECUÇÃO EM PARALELO: Evita que o erro de uma tabela trave o carregamento das outras
+            await Promise.all([
+                loadPerfil().catch(e => console.error("Erro Perfil:", e)),
+                loadServicos().catch(e => console.error("Erro Servicos:", e)),
+                loadHorariosView().catch(e => console.error("Erro Horarios:", e))
+            ]);
+            
+            await loadAgendamentos().catch(e => console.error("Erro Agendamentos:", e));
             switchTab('agendamentos');
             document.getElementById('global-loader').classList.add('hidden');
         }
 
         function switchTab(targetTab) {
             if (currentTab === 'horarios' && targetTab !== 'horarios' && isHorariosDirty) {
-                if (!confirm("Você possui horários modificados que não foram salvos! Deseja descartar as alterações?")) return;
+                if (!confirm("Você possui horários modificados que não foram salvos! Deseja descartar?")) return;
                 isHorariosDirty = false;
                 loadHorariosView();
             }
@@ -342,7 +330,13 @@
                 document.getElementById('config-empresa-slug').value = data.slug || "";
                 document.getElementById('config-empresa-logo').value = data.logo_url || "";
                 document.getElementById('config-empresa-bio').value = data.bio || "";
-                document.getElementById('link-display').innerText = `${window.location.host}/?s=${(data.slug || "").toLowerCase()}`;
+                
+                // Fallback seguro caso o slug da coluna não venha preenchido de início
+                const identifier = data.slug ? data.slug.toLowerCase() : data.id;
+                document.getElementById('link-display').innerText = `${window.location.host}/agendamento.html?s=${identifier}`;
+            } else {
+                // Fallback se RLS bloquear ou não achar o registro 8
+                document.getElementById('link-display').innerText = `${window.location.host}/agendamento.html?s=${companyId}`;
             }
         }
 
@@ -351,8 +345,9 @@
             const slug = document.getElementById('config-empresa-slug').value.trim().toLowerCase().replace(/\s+/g, '-');
             const logo = document.getElementById('config-empresa-logo').value.trim();
             const bio = document.getElementById('config-empresa-bio').value.trim();
+            
             const { error } = await supabaseClient.from('empresas').update({ empresa: name, slug: slug, logo_url: logo, bio: bio }).eq('id', companyId);
-            if (!error) { alert("Perfil empresarial atualizado!"); loadPerfil(); }
+            if (!error) { alert("Perfil empresarial atualizado!"); loadPerfil(); } else { alert(error.message); }
         }
 
         function copyClientLink() {
@@ -365,8 +360,10 @@
             const container = document.getElementById('agendamentos-table-body');
             const { data } = await supabaseClient.from('agendamentos').select('*').eq('eid', companyId);
             existingAppointments = data || [];
+            
             const filtrados = existingAppointments.filter(a => a.horario && a.horario.substring(0, 10) === dateFilter).sort((a,b) => a.horario.localeCompare(b.horario));
-            if(filtrados.length === 0) { container.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 italic">Sem agendamentos.</td></tr>`; return; }
+            if(filtrados.length === 0) { container.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 italic">Sem agendamentos para este dia.</td></tr>`; return; }
+            
             container.innerHTML = filtrados.map(a => {
                 const srv = allServices.find(s => s.id == (a.servicos_id || a.servico_id));
                 const horaLimpa = moment(a.horario.replace('Z','')).format('HH:mm');
@@ -375,7 +372,7 @@
         }
 
         async function deleteAgendamento(id) {
-            if (confirm("Deseja cancelar este agendamento?")) {
+            if (confirm("Deseja apagar este agendamento?")) {
                 const { error } = await supabaseClient.from('agendamentos').delete().eq('id', id);
                 if (!error) loadAgendamentos();
             }
@@ -411,7 +408,8 @@
                     if (slotEnd.isAfter(moment(`${dateISO} ${config.fim}`, "YYYY-MM-DD HH:mm:ss"))) { current.add(30, 'minutes'); continue; }
                     const isOccupied = existingAppointments.some(a => {
                         if (!a.horario) return false;
-                        const agInicio = moment(a.horario.replace('Z', '').substring(0, 19));
+                        const dataLimpa = a.horario.replace('Z', '').substring(0, 19);
+                        const agInicio = moment(dataLimpa);
                         const srvDoAgend = allServices.find(s => s.id == (a.servicos_id || a.servico_id));
                         const agFim = agInicio.clone().add(srvDoAgend ? (parseInt(srvDoAgend.tempo) || 30) : 30, 'minutes');
                         return (slotStart.isBefore(agFim) && slotEnd.isAfter(agInicio));
@@ -431,8 +429,9 @@
             const time = document.getElementById('modal-agend-time').value;
             if (name.length < 3 || phone.length < 10 || !time) return alert("Preencha os campos!");
             const timestamp = moment(`${date} ${time}`, "YYYY-MM-DD HH:mm").format("YYYY-MM-DD HH:mm:ss");
+            
             const { error } = await supabaseClient.from('agendamentos').insert({ eid: companyId, cliente: name, whatsapp: phone, horario: timestamp, servicos_id: parseInt(idServico), status: 'confirmado' });
-            if (!error) { closeAppointmentModal(); loadAgendamentos(); }
+            if (!error) { closeAppointmentModal(); loadAgendamentos(); } else { alert(error.message); }
         }
 
         async function loadServicos() {
@@ -513,7 +512,7 @@
             isHorariosDirty = false;
             await loadHorariosView();
             document.getElementById('global-loader').classList.add('hidden');
-            alert("Horários atualizados!");
+            alert("Horários salvos!");
         }
 
         function populateDurationDropdowns() {
@@ -547,7 +546,6 @@
             i.value = (parseInt(val || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         }
 
-        // Executa a barreira de login imediatamente ao carregar
         window.onload = checkAuth;
     </script>
 </body>
